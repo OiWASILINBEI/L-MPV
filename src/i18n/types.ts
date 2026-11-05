@@ -7,7 +7,7 @@
  */
 
 /** Доступные локали плеера. */
-export type Locale = "ru" | "en";
+export type Locale = "ru" | "en" | "zh";
 
 /**
  * Полная структура словаря переводов.
@@ -190,6 +190,7 @@ export interface TranslationDict {
       languageDesc: string;
       languageRu: string;
       languageEn: string;
+      languageZh: string;
       // Контекстное меню
       contextMenuSection: string;
       // Качество видео и аудио
@@ -1005,6 +1006,7 @@ export interface TranslationDict {
     dragHeader: string;
     langTooltipRu: string;
     langTooltipEn: string;
+    langTooltipZh: string;
     copyReport: string;
     exportTxt: string;
     close: string;
