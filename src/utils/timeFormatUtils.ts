@@ -133,7 +133,7 @@ export function formatTimeByMode(
       const hours = finishDate.getHours().toString().padStart(2, "0");
       const minutes = finishDate.getMinutes().toString().padStart(2, "0");
       const activeLocale = locale ?? getEffectiveLocale();
-      const prefix = activeLocale === "ru" ? "Конец в" : "Ends at";
+      const prefix = activeLocale === "ru" ? "Конец в" : activeLocale === "zh" ? "结束于" : "Ends at";
       const full = `${prefix} ${hours}:${minutes} (${formatTime(posSec)})`;
       const compact = `~${hours}:${minutes}`;
       return { full, compact };
