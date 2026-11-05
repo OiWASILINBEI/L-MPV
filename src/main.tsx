@@ -9,6 +9,8 @@ import { PlayerStateProvider } from "./contexts/PlayerStateContext";
 import { LanguageProvider } from "./i18n/LanguageContext";
 import { applyPlayerTheme } from "./utils/colorUtils";
 import { initSurfaceHierarchy } from "./utils/surfaceHierarchy";
+// 汉化版补丁挂点：拖动视频画面移动窗口等改动都在 src/zh-cn/ 里
+import "./zh-cn";
 import {
   hydrateUiSettingsFromDisk,
   initUiSettingsAutoSync,
