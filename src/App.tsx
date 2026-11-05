@@ -656,8 +656,10 @@ function App() {
       case "togglePause":
         curProlongControlsIfActive();
         if (curHasMedia) {
+          const wasPaused = Boolean(curMediaInfo?.paused);
           try {
             await curTogglePause();
+            triggerOsd(wasPaused ? dict.controls.play : dict.controls.pause, 900);
           } catch (e) {
             console.error(e);
           }
@@ -693,6 +695,7 @@ function App() {
         curProlongControlsIfActive();
         const raw = localStorage.getItem('l-mpv-skip-opening-seconds');
         const seconds = Number(raw || 90);
+        triggerSeekIndicator("right", seconds);
         await curSeekBy(seconds);
         break;
       }
@@ -707,9 +710,12 @@ function App() {
       case "toggleMute":
         if (curMediaInfo) curSetVolume(curMediaInfo.volume === 0 ? 100 : 0);
         break;
-      case "fullscreen":
-        curToggleFullscreen();
+      case "fullscreen": {
+        const wasFullscreen = latestRef.current.isFullscreen;
+        await curToggleFullscreen();
+        triggerOsd(wasFullscreen ? dict.controls.exitFullscreen : dict.controls.fullscreen, 1200);
         break;
+      }
       case "frameBack":
         if (isSteppingRef.current) return;
         isSteppingRef.current = true;
@@ -857,11 +863,18 @@ function App() {
         window.dispatchEvent(new CustomEvent("l-mpv-toggle-popover", { detail: { type: "sub" } }));
         break;
       case "playlistPrev":
-        invoke("playlist_prev").catch(console.error);
+      case "playlistNext": {
+        const goNext = actionId === "playlistNext";
+        invoke(goNext ? "playlist_next" : "playlist_prev").catch(console.error);
+        // Имя нового файла приходит асинхронно — показываем его после переключения
+        window.setTimeout(() => {
+          const path = latestRef.current.mediaInfo?.path;
+          if (path) {
+            triggerOsd(dict.osd.nowPlaying(path.split(/[/\\]/).pop() || path), 1800);
+          }
+        }, 700);
         break;
-      case "playlistNext":
-        invoke("playlist_next").catch(console.error);
-        break;
+      }
       case "speedUp":
         if (curMediaInfo) {
           const newSpeed = Math.min(4.0, (curMediaInfo.speed || 1.0) + 0.25);
@@ -883,13 +896,20 @@ function App() {
         }
         break;
       case "toggleShuffle":
-        invoke("toggle_shuffle").catch(console.error);
+        try {
+          await invoke("toggle_shuffle");
+          triggerOsd(dict.controls.shuffle, 1200);
+        } catch (e) { console.error(e); }
         break;
       case "alwaysOnTop":
         try {
           const appWindow = getCurrentWindow();
           const current = await appWindow.isAlwaysOnTop();
           await appWindow.setAlwaysOnTop(!current);
+          triggerOsd(
+            `${dict.controls.alwaysOnTop}: ${current ? dict.osd.disabled : dict.osd.enabled}`,
+            1200,
+          );
           window.dispatchEvent(new CustomEvent("l-mpv-action", { detail: actionId }));
         } catch (e) { console.error(e); }
         break;
