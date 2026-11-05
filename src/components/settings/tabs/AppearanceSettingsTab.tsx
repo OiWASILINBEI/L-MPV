@@ -28,7 +28,7 @@ import {
   DEFAULT_UI_OPACITY,
 } from "../../../utils/uiThemeUtils";
 import { TimeDisplayPosition, TIME_POSITION_OPTIONS } from "../../../utils/timePositionUtils";
-import { TimeFormatMode, TIME_FORMAT_OPTIONS } from "../../../utils/timeFormatUtils";
+import { TimeFormatMode, getTimeFormatOptions } from "../../../utils/timeFormatUtils";
 import { ControlBarStyle } from "../../../utils/controlBarStyleUtils";
 import { saveSeekStepSeconds } from "../../../utils/seekUtils";
 import type { AmbientMode } from "../../../utils/ambientSettingsUtils";
@@ -941,7 +941,7 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
 
                             {/* 4 компактные сегментные кнопки с примерами тайминга */}
                             <div className="time-format-compact-grid">
-                              {TIME_FORMAT_OPTIONS.map((formatOption) => {
+                              {getTimeFormatOptions().map((formatOption) => {
                                 const isSel = timeFormat === formatOption.id;
                                 return (
                                   <button
