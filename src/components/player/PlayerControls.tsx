@@ -95,6 +95,8 @@ export function PlayerControls({
 }) {
   const { mediaInfo, isPlaylistOpen, setIsPlaylistOpen } = usePlayerState();
   const { dict } = useTranslation();
+  const mediaInfoRef = useRef(mediaInfo);
+  mediaInfoRef.current = mediaInfo;
 
   const paused = mediaInfo?.paused ?? true;
   const contextVolume = mediaInfo?.volume ?? 100;
@@ -458,6 +460,7 @@ export function PlayerControls({
   }, [togglePause]);
 
   const handleSeek = useCallback(async (seconds: number) => {
+    triggerSeekIndicator(seconds >= 0 ? "right" : "left", Math.abs(seconds));
     try {
       await seekBy(seconds);
     } catch (e) {
@@ -465,21 +468,33 @@ export function PlayerControls({
     }
   }, [seekBy]);
 
+  const showNowPlayingOsd = useCallback(() => {
+    // Имя нового файла приходит асинхронно — показываем его после переключения
+    window.setTimeout(() => {
+      const path = mediaInfoRef.current?.path;
+      if (path) {
+        showOsd(dict.osd.nowPlaying(path.split(/[/\\]/).pop() || path), { durationMs: 1800 });
+      }
+    }, 700);
+  }, [dict.osd.nowPlaying]);
+
   const handlePlaylistPrev = useCallback(async () => {
     try {
       await invoke("playlist_prev");
+      showNowPlayingOsd();
     } catch (e) {
       console.error(e);
     }
-  }, []);
+  }, [showNowPlayingOsd]);
 
   const handlePlaylistNext = useCallback(async () => {
     try {
       await invoke("playlist_next");
+      showNowPlayingOsd();
     } catch (e) {
       console.error(e);
     }
-  }, []);
+  }, [showNowPlayingOsd]);
 
   const handleVolumeChange = (newVol: number, commit: boolean = true) => {
     if (commit) {
@@ -502,16 +517,19 @@ export function PlayerControls({
   const handleToggleRepeat = useCallback(async () => {
     const nextMode = (repeatMode + 1) % 3 as 0 | 1 | 2;
     setRepeatMode(nextMode);
+    const repeatLabel = nextMode === 0 ? dict.controls.repeatOff
+      : nextMode === 1 ? dict.controls.repeatOne : dict.controls.repeatAll;
     try {
       // Единая команда: оба свойства выставляются вместе, иначе после
       // «повтор плейлиста» переход в «повтор файла» оставил бы оба режима.
       await invoke("set_repeat_mode", { mode: nextMode });
+      showOsd(repeatLabel, { durationMs: 1200 });
     } catch (e) {
       console.error(e);
       // Откат локального состояния: иначе иконка расходится с mpv.
       setRepeatMode(repeatMode);
     }
-  }, [repeatMode]);
+  }, [repeatMode, dict.controls.repeatOff, dict.controls.repeatOne, dict.controls.repeatAll]);
 
   // Синхронизация режима повтора с mpv при старте (значение могло прийти
   // из ПКМ-меню или дефолта mpv до монтирования панели).
@@ -547,6 +565,7 @@ export function PlayerControls({
   const handleShuffle = async () => {
     try {
       await invoke("toggle_shuffle");
+      showOsd(dict.controls.shuffle, { durationMs: 1200 });
     } catch (e) {
       console.error(e);
     }
@@ -560,6 +579,10 @@ export function PlayerControls({
       const current = await appWindow.isAlwaysOnTop();
       await appWindow.setAlwaysOnTop(!current);
       setIsAlwaysOnTop(!current);
+      showOsd(
+        `${dict.controls.alwaysOnTop}: ${current ? dict.osd.disabled : dict.osd.enabled}`,
+        { durationMs: 1200 },
+      );
     } catch (e) { console.error(e); }
   };
 
