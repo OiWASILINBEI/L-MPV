@@ -21,6 +21,7 @@ import { PlayerControls } from "./components/player/PlayerControls";
 import { ContextMenu } from "./components/player/ContextMenu";
 import { PlaylistDrawer } from "./components/player/PlaylistDrawer";
 import { SeekIndicator } from "./components/player/SeekIndicator";
+import { formatSpeedValue } from "./components/player/controls";
 import { UpdateInfo } from "./components/modals/UpdateModal";
 import { getVisualizerConfig, saveVisualizerConfig, VisualizerMode } from "./components/player/AudioVisualizer";
 import { applyAccentColor } from "./utils/colorUtils";
@@ -182,14 +183,18 @@ function App() {
   const hasMediaRef = useRef(hasMedia);
   const isSteppingRef = useRef(false);
   const videoZoomRef = useRef<number>(0);
+  const videoRotationRef = useRef<number>(0);
   const videoPanXRef = useRef<number>(0);
   const videoPanYRef = useRef<number>(0);
   const rafIdRef = useRef<number | null>(null);
+  const videoDragRef = useRef<{ startX: number; startY: number; moved: boolean } | null>(null);
+  const suppressVideoClickRef = useRef(false);
 
 
   useEffect(() => {
     hasMediaRef.current = hasMedia;
     videoZoomRef.current = 0;
+    videoRotationRef.current = 0;
     videoPanXRef.current = 0;
     videoPanYRef.current = 0;
   }, [hasMedia]);
@@ -801,14 +806,14 @@ function App() {
         break;
       }
       case "rotateVideo": {
+        const nextRot = (videoRotationRef.current + 90) % 360;
+        videoRotationRef.current = nextRot;
         try {
-          const curRot = (mediaInfo as any)?.rotation || 0;
-          const nextRot = (curRot + 90) % 360;
           await invoke("set_rotation", { degrees: nextRot });
-          triggerOsd(dict.osd.rotation(nextRot), 1500);
         } catch (e) {
           console.error(e);
         }
+        triggerOsd(dict.osd.rotation(nextRot), 1500);
         break;
       }
       case "toggleLanguage": {
@@ -861,16 +866,21 @@ function App() {
         if (curMediaInfo) {
           const newSpeed = Math.min(4.0, (curMediaInfo.speed || 1.0) + 0.25);
           invoke("set_speed", { speed: newSpeed }).catch(console.error);
+          triggerOsd(dict.osd.speed(formatSpeedValue(newSpeed)), 1200);
         }
         break;
       case "speedDown":
         if (curMediaInfo) {
           const newSpeed = Math.max(0.25, (curMediaInfo.speed || 1.0) - 0.25);
           invoke("set_speed", { speed: newSpeed }).catch(console.error);
+          triggerOsd(dict.osd.speed(formatSpeedValue(newSpeed)), 1200);
         }
         break;
       case "speedReset":
-        invoke("set_speed", { speed: 1.0 }).catch(console.error);
+        if (curMediaInfo) {
+          invoke("set_speed", { speed: 1.0 }).catch(console.error);
+          triggerOsd(dict.osd.speed(formatSpeedValue(1.0)), 1200);
+        }
         break;
       case "toggleShuffle":
         invoke("toggle_shuffle").catch(console.error);
@@ -1017,6 +1027,11 @@ function App() {
   const handleVideoClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.button !== 0) return;
+      // Клик, завершивший перетаскивание окна, не должен переключать паузу/полный экран
+      if (suppressVideoClickRef.current) {
+        suppressVideoClickRef.current = false;
+        return;
+      }
       closeContextMenu();
       if (latestRef.current.isPlaylistOpen) {
         latestRef.current.setIsPlaylistOpen(false);
@@ -1128,6 +1143,32 @@ function App() {
     },
     [executeAction]
   );
+
+  // ─── Перетаскивание окна за видеополотно (левая кнопка мыши) ───
+  const handleVideoMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    suppressVideoClickRef.current = false;
+    videoDragRef.current = { startX: e.clientX, startY: e.clientY, moved: false };
+  }, []);
+
+  const handleVideoMouseMove = useCallback((e: React.MouseEvent) => {
+    const drag = videoDragRef.current;
+    if (!drag || drag.moved) return;
+    if ((e.buttons & 1) === 0 || latestRef.current.isFullscreen) return;
+    if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < 6) return;
+    drag.moved = true;
+    // Подавляем последующий клик, иначе после перетаскивания сработает пауза
+    suppressVideoClickRef.current = true;
+    if (clickTimerRef.current !== null) {
+      window.clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+    }
+    getCurrentWindow().startDragging().catch(console.error);
+  }, []);
+
+  const handleVideoMouseUp = useCallback(() => {
+    videoDragRef.current = null;
+  }, []);
 
   useEffect(() => {
     const updateHotkeys = () => setHotkeys(getCustomHotkeys());
@@ -1308,6 +1349,10 @@ function App() {
       <div
         className={`video-area ${!hasMedia ? "video-area--empty" : ""}`}
         data-tauri-drag-region={undefined}
+        onMouseDown={handleVideoMouseDown}
+        onMouseMove={handleVideoMouseMove}
+        onMouseUp={handleVideoMouseUp}
+        onMouseLeave={handleVideoMouseUp}
         onClick={handleVideoClick}
         onContextMenu={handleVideoContextMenu}
         onAuxClick={handleVideoAuxClick}
