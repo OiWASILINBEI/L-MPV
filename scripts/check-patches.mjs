@@ -67,6 +67,19 @@ readFile("src/i18n/locales/zh.ts");
 const timeFormat = readFile("src/utils/timeFormatUtils.ts");
 requirePattern("src/utils/timeFormatUtils.ts", timeFormat, /getTimeFormatOptions/, "时间格式选项函数");
 
+// 6) 音视频徽章 Lua 插件资产必须存在（startup-format-logos）
+readFile("bundled/portable-assets/scripts/startup-format-logos.lua");
+readFile("bundled/portable-assets/config/script-modules/startup-logo-bounds.lua");
+readFile("bundled/portable-assets/config/script-assets/startup-format-logos/runtime/manifest.json");
+// mpv 启动时需要扫描 scripts/ 目录，config-dir 已设为 Portable-L-MPV/config
+// Rust 端不应禁掉 mpv 默认的 scripts 扫描
+const mpvManager = readFile("src-tauri/src/mpv_manager.rs");
+if (mpvManager) {
+  forbidPattern("src-tauri/src/mpv_manager.rs", mpvManager,
+    /set_option.*"scripts"/,
+    "显式覆盖 scripts 选项（mpv 默认扫 config-dir/scripts/，保持即可）");
+}
+
 if (failures.length > 0) {
   console.error("❌ 编译前自检未通过：上游改动动到了汉化版的挂点，请先修复再编译。");
   for (const item of failures) {
