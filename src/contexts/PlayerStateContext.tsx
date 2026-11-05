@@ -1048,7 +1048,10 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
     if (audioTracks.length === 0) return;
     const currentIdx = audioTracks.findIndex((t) => t.selected);
     const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % audioTracks.length;
-    await selectAudioTrack(audioTracks[nextIdx].id);
+    const next = audioTracks[nextIdx];
+    await selectAudioTrack(next.id);
+    const d = getDict(getEffectiveLocale());
+    showOsd(d.osd.audioTrack(next.title || next.lang || `#${next.id}`), { durationMs: 1400 });
   }, [tracks, selectAudioTrack]);
 
   const cycleSubTrack = useCallback(async () => {
@@ -1056,11 +1059,18 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
     if (subTracks.length === 0) return;
     const currentIdx = subTracks.findIndex((t) => t.selected);
     const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % (subTracks.length + 1); // +1 для состояния "отключено"
-    
+    const d = getDict(getEffectiveLocale());
+
     if (nextIdx === subTracks.length) {
       await disableSubtitles();
+      showOsd(d.osd.subTrack(d.controls.subOff), { durationMs: 1400 });
     } else {
-      await selectSubTrack(subTracks[nextIdx].id);
+      const next = subTracks[nextIdx];
+      await selectSubTrack(next.id);
+      showOsd(
+        d.osd.subTrack(next.external_filename || next.title || next.lang || `#${next.id}`),
+        { durationMs: 1400 },
+      );
     }
   }, [tracks, selectSubTrack, disableSubtitles]);
 
