@@ -71,7 +71,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'L-MPV v__VERSION__'
-          releaseBody: 'L-MPV 媒体播放器自动构建版本，支持实时 4K AI 超分辨率 (DirectML / TensorRT)。本仓库为简体中文汉化版。'
+          releaseBody: 'L-MPV 媒体播放器简体中文汉化版（详见下方中文更新日志）。'
           releaseDraft: false
           prerelease: false
 
@@ -110,6 +110,24 @@ jobs:
           gh release upload $tag $portableZip --clobber
           gh release upload $tag "src-tauri/target/release/l-mpv.exe#l-mpv.exe" --clobber
           gh release upload $tag "checksums.json#checksums.json" --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 应用纯中文发布说明
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if (-not $tag -or $tag -notmatch '^v\d+') {
+            $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
+            $tag = "v$ver"
+          }
+          if (Test-Path ".github/release-notes-zh.md") {
+            Write-Host "正在将中文更新日志应用到发布页 $tag ..."
+            gh release edit $tag --notes-file .github/release-notes-zh.md
+            Write-Host "中文发布说明已更新完成。"
+          } else {
+            Write-Host "未找到 .github/release-notes-zh.md，跳过发布说明更新。"
+          }
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
