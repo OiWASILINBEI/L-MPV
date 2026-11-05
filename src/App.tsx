@@ -63,6 +63,28 @@ const SubtitlesSearchModal = lazy(() =>
   import("./components/subtitles/SubtitlesSearchModal").then((m) => ({ default: m.SubtitlesSearchModal }))
 );
 
+/**
+ * Clean a URL-derived display name:
+ * 1. decode percent-encoding (%E4%B9%9D -> 中文)
+ * 2. cut the "?sign=..." query tail FIRST so the file extension is kept
+ * 3. drop yt-dlp CDN segment junk like "_BV1xxx.p2.mp4" only when a
+ *    non-empty prefix remains (never eats the whole name)
+ */
+function cleanUrlDisplayName(raw: string): string {
+  if (!raw) return raw;
+  let name = raw;
+  if (name.includes("%")) {
+    try {
+      name = decodeURIComponent(name);
+    } catch (_) {}
+  }
+  const q = name.indexOf("?");
+  if (q > 0) name = name.slice(0, q);
+  const m = name.match(/^(.*?)[_\s]+[A-Za-z0-9][A-Za-z0-9.-]*\.(?:mp4|flv|mkv|webm|ts|m4s|m3u8)$/i);
+  if (m && m[1]) name = m[1];
+  return name || raw;
+}
+
 function App() {
   const { dict } = useTranslation();
   const {
@@ -194,12 +216,10 @@ function App() {
           const t = await invoke<string>("mpv_get_property_string", { name: "media-title" });
           if (cancelled) return;
           if (t && t !== p) {
-            // Strip CDN junk like "_BV1xxx.p2.mp4?..." appended by yt-dlp on segmented streams
-            let clean = t.replace(/[_\s]*[\w.-]*\.(?:mp4|flv|mkv|webm|ts|m4s|m3u8)\?.*$/i, "");
-            // Also strip plain query tail (?sign=...) while keeping the extension
-            const q = clean.indexOf("?");
-            if (q > 0) clean = clean.slice(0, q);
-            setMediaTitleOverride(clean || t);
+            // For direct links media-title can be the URL itself; keep only
+            // the last path segment before cleaning.
+            const lastSeg = /^https?:\/\//i.test(t) ? t.split(/[/\\]/).pop() || t : t;
+            setMediaTitleOverride(cleanUrlDisplayName(lastSeg));
             return;
           }
         } catch (_) {}
@@ -210,7 +230,14 @@ function App() {
     return () => { cancelled = true; };
   }, [mediaInfo?.path]);
 
-  const mediaTitle = mediaTitleOverride || (mediaInfo?.path ? mediaInfo.path.split(/[/\\]/).pop() || "" : "");
+  // Fallback (override not resolved yet, or media-title == path for direct
+  // links): URL paths get the same cleaning so "?sign=..." never leaks.
+  const rawFallbackName = mediaInfo?.path ? mediaInfo.path.split(/[/\\]/).pop() || "" : "";
+  const mediaTitle =
+    mediaTitleOverride ||
+    (/^https?:\/\//i.test(mediaInfo?.path || "")
+      ? cleanUrlDisplayName(rawFallbackName)
+      : rawFallbackName);
 
   const clickTimerRef = useRef<number | null>(null);
   const hasMediaRef = useRef(hasMedia);
