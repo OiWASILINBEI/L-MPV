@@ -988,8 +988,8 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       const t = tracksRef.current.find(x => x.type === "audio" && x.id === trackId);
       if (t) {
         const curLoc = getEffectiveLocale();
-        const prefix = curLoc === "en" ? "Audio: " : "Аудио: ";
-        const fallback = curLoc === "en" ? `Track ${t.id}` : `Дорожка ${t.id}`;
+        const prefix = curLoc === "en" ? "Audio: " : curLoc === "zh" ? "音轨: " : "Аудио: ";
+        const fallback = curLoc === "en" ? `Track ${t.id}` : curLoc === "zh" ? `轨道 ${t.id}` : `Дорожка ${t.id}`;
         invoke("show_osd", { text: `${prefix}${t.title || t.lang || fallback}` }).catch(() => {});
       }
       await loadTracks();
@@ -1007,7 +1007,7 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       });
       await invoke("disable_subtitles");
       const curLoc = getEffectiveLocale();
-      const offText = curLoc === "en" ? "Subtitles: Off" : "Субтитры: Выкл";
+      const offText = curLoc === "en" ? "Subtitles: Off" : curLoc === "zh" ? "字幕: 关" : "Субтитры: Выкл";
       invoke("show_osd", { text: offText }).catch(() => {});
       await loadTracks();
     } catch (e) {
@@ -1030,8 +1030,8 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       const t = tracksRef.current.find(x => x.type === "sub" && x.id === trackId);
       if (t) {
         const curLoc = getEffectiveLocale();
-        const prefix = curLoc === "en" ? "Subtitles: " : "Субтитры: ";
-        const fallback = curLoc === "en" ? `Track ${t.id}` : `Дорожка ${t.id}`;
+        const prefix = curLoc === "en" ? "Subtitles: " : curLoc === "zh" ? "字幕: " : "Субтитры: ";
+        const fallback = curLoc === "en" ? `Track ${t.id}` : curLoc === "zh" ? `轨道 ${t.id}` : `Дорожка ${t.id}`;
         invoke("show_osd", { text: `${prefix}${t.title || t.lang || fallback}` }).catch(() => {});
       }
       await loadTracks();
@@ -1183,6 +1183,8 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       if (!cleanTrackName) {
         const typeLabel = curLocale === "en"
           ? (track.type === "audio" ? "Audio" : "Subtitles")
+          : curLocale === "zh"
+          ? (track.type === "audio" ? "音轨" : "字幕")
           : (track.type === "audio" ? "Аудио" : "Субтитры");
         cleanTrackName = track.lang
           ? `${typeLabel}_${track.lang.toUpperCase()}`
@@ -1214,9 +1216,13 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       } else {
         const dialogTitle = curLocale === "en"
           ? `Save ${track.type === "audio" ? "audio track" : "subtitles"}`
+          : curLocale === "zh"
+          ? `保存${track.type === "audio" ? "音轨" : "字幕"}`
           : `Сохранить ${track.type === "audio" ? "аудиодорожку" : "субтитры"}`;
         const filterName = curLocale === "en"
           ? (track.type === "audio" ? "Audio file" : "Subtitles")
+          : curLocale === "zh"
+          ? (track.type === "audio" ? "音频文件" : "字幕")
           : (track.type === "audio" ? "Аудиофайл" : "Субтитры");
 
         finalTargetPath = await save({
@@ -1252,6 +1258,8 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
 
       const successLabel = curLocale === "en"
         ? (track.type === "audio" ? "Audio track saved" : "Subtitles saved")
+        : curLocale === "zh"
+        ? (track.type === "audio" ? "音轨已保存" : "字幕已保存")
         : (track.type === "audio" ? "Аудиодорожка сохранена" : "Субтитры сохранены");
       window.dispatchEvent(
         new CustomEvent("show-osd", {
