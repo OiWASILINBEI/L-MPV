@@ -94,7 +94,7 @@ export function PlayerControls({
   onOpenSettings?: () => void;
 }) {
   const { mediaInfo, isPlaylistOpen, setIsPlaylistOpen } = usePlayerState();
-  const { dict } = useTranslation();
+  const { dict, locale } = useTranslation();
   const mediaInfoRef = useRef(mediaInfo);
   mediaInfoRef.current = mediaInfo;
 
@@ -241,9 +241,9 @@ export function PlayerControls({
     const nextFormat = getNextTimeFormat(timeFormat);
     setTimeFormat(nextFormat);
     saveTimeFormat(nextFormat);
-    const option = getTimeFormatOptions().find((opt) => opt.id === nextFormat);
+    const option = getTimeFormatOptions(locale).find((opt) => opt.id === nextFormat);
     showOsd(dict.osd.timeFormat(option?.label || nextFormat));
-  }, [timeFormat, dict]);
+  }, [timeFormat, dict, locale]);
 
   // Синхронизация локальных настроек плеера (не зависит от активных поповеров)
   useEffect(() => {
