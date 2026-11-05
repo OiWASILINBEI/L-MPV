@@ -9,9 +9,10 @@
 import type { Locale, TranslationDict } from "./types";
 import { ru } from "./locales/ru";
 import { en } from "./locales/en";
+import { zh } from "./locales/zh";
 
 /** Реестр всех доступных словарей. */
-const locales: Record<Locale, TranslationDict> = { ru, en };
+const locales: Record<Locale, TranslationDict> = { ru, en, zh };
 
 /** Ключ хранения выбранного языка в localStorage. */
 const LOCALE_STORAGE_KEY = "l-mpv-language";
@@ -23,7 +24,7 @@ const LOCALE_STORAGE_KEY = "l-mpv-language";
 export function getSavedLocale(): Locale | undefined {
   try {
     const raw = localStorage.getItem(LOCALE_STORAGE_KEY);
-    if (raw === "ru" || raw === "en") return raw;
+    if (raw === "ru" || raw === "en" || raw === "zh") return raw;
   } catch {
     // localStorage недоступен
   }
@@ -54,11 +55,19 @@ export function detectSystemLocale(): Locale {
   if (cachedSystemLocale) return cachedSystemLocale;
   try {
     const lang = navigator.language?.toLowerCase() ?? "";
+    if (lang.startsWith("zh")) {
+      cachedSystemLocale = "zh";
+      return "zh";
+    }
     if (lang.startsWith("ru")) {
       cachedSystemLocale = "ru";
       return "ru";
     }
     if (Array.isArray(navigator.languages)) {
+      if (navigator.languages.some((l) => l.toLowerCase().startsWith("zh"))) {
+        cachedSystemLocale = "zh";
+        return "zh";
+      }
       if (navigator.languages.some((l) => l.toLowerCase().startsWith("ru"))) {
         cachedSystemLocale = "ru";
         return "ru";
