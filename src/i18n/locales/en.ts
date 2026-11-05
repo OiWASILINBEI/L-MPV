@@ -191,6 +191,7 @@ export const en: TranslationDict = {
         "Choose the display language for all player controls and settings.",
       languageRu: "Русский",
       languageEn: "English",
+      languageZh: "中文",
       // Context menu
       contextMenuSection: "Context Menu (RMB)",
       // Video & Audio Settings
@@ -1172,7 +1173,8 @@ export const en: TranslationDict = {
     title: "MediaInfo",
     dragHeader: "Drag to move window across the player",
     langTooltipRu: "Language: Russian (click to switch to EN)",
-    langTooltipEn: "Language: English (click for RU)",
+    langTooltipEn: "Language: English (click for 中文)",
+    langTooltipZh: "Language: 中文 (click for RU)",
     copyReport: "Copy report to clipboard",
     exportTxt: "Save to .txt file",
     close: "Close (Esc)",
