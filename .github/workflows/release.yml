@@ -125,6 +125,7 @@ jobs:
           Copy-Item "$assetRoot/config/scripts/*.lua" -Destination "Portable-L-MPV/config/scripts/" -Force
           Copy-Item "$assetRoot/config/script-modules/startup-logo-bounds.lua" -Destination "Portable-L-MPV/config/script-modules/" -Force
           Copy-Item "$assetRoot/config/script-opts/startup_format_logos.conf" -Destination "Portable-L-MPV/config/script-opts/" -Force
+          Copy-Item "$assetRoot/config/script-opts/stats.conf" -Destination "Portable-L-MPV/config/script-opts/" -Force
           Copy-Item "$assetRoot/config/script-assets/*" -Destination "Portable-L-MPV/config/script-assets/" -Recurse -Force
           Write-Host "Lua 插件打包完成。"
 

@@ -1072,10 +1072,10 @@ export function PlayerControls({
           aria-label={dict.controls.mediaInfo}
           onClick={handleShowFileInfo}
           onContextMenu={(e) => {
-            // 右键：切换 stats 统计面板（mpv 内置 stats 占用名字，我们的加载为 stats2）
+            // 右键：切换 stats 统计面板（内置 stats 已被 load-stats-overlay=no 禁用）
             e.preventDefault();
             invoke("mpv_command", {
-              command: "script-binding stats2/display-stats-toggle",
+              command: "script-binding stats/display-stats-toggle",
             }).catch(() => {});
           }}
         >

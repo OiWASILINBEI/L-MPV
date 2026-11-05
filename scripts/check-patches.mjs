@@ -72,6 +72,7 @@ readFile("bundled/portable-assets/config/scripts/startup-format-logos.lua");
 readFile("bundled/portable-assets/config/scripts/stats.lua");
 readFile("bundled/portable-assets/config/script-modules/startup-logo-bounds.lua");
 readFile("bundled/portable-assets/config/script-assets/startup-format-logos/runtime/manifest.json");
+readFile("bundled/portable-assets/config/script-opts/stats.conf");
 
 // 7) stats 右键触发链路：Rust 通用命令 + 前端按钮事件
 const playback = readFile("src-tauri/src/commands/playback.rs");
@@ -79,7 +80,9 @@ requirePattern("src-tauri/src/commands/playback.rs", playback, /pub fn mpv_comma
 const libRs = readFile("src-tauri/src/lib.rs");
 requirePattern("src-tauri/src/lib.rs", libRs, /commands::mpv_command/, "mpv_command 注册");
 const playerControls = readFile("src/components/player/PlayerControls.tsx");
-requirePattern("src/components/player/PlayerControls.tsx", playerControls, /stats2\/display-stats-toggle/, "文件信息按钮右键触发 stats");
+requirePattern("src/components/player/PlayerControls.tsx", playerControls, /stats\/display-stats-toggle/, "文件信息按钮右键触发 stats");
+const mpvMgr = readFile("src-tauri/src/mpv_manager.rs");
+requirePattern("src-tauri/src/mpv_manager.rs", mpvMgr, /load-stats-overlay/, "内置 stats 禁用（让位给 v30）");
 
 if (failures.length > 0) {
   console.error("❌ 编译前自检未通过：上游改动动到了汉化版的挂点，请先修复再编译。");
