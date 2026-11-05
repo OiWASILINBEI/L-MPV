@@ -87,7 +87,6 @@ requirePattern("src-tauri/src/mpv_manager.rs", mpvMgr, /load-stats-overlay/, "�
 // 8) build 6：stats 位置补丁、数字键翻页、链接播放
 const statsLua = readFile("bundled/portable-assets/config/scripts/stats.lua");
 requirePattern("bundled/portable-assets/config/scripts/stats.lua", statsLua, /\\pos\(5\.5,14\)/, "stats 面板位置补丁 pos(5.5,14)");
-const appTsx = readFile("src/App.tsx");
 requirePattern("src/App.tsx", appTsx, /stats\/display-page-/, "数字键 1~4 转发 stats 翻页");
 requirePattern("src/App.tsx", appTsx, /clipboard\.readText/, "Ctrl+V 粘贴链接播放");
 requirePattern("src-tauri/src/mpv_manager.rs", mpvMgr, /ytdl_hook-ytdl_path/, "ytdl_hook 指向打包的 yt-dlp");
