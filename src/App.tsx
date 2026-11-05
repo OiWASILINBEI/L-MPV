@@ -194,7 +194,9 @@ function App() {
           const t = await invoke<string>("mpv_get_property_string", { name: "media-title" });
           if (cancelled) return;
           if (t && t !== p) {
-            setMediaTitleOverride(t);
+            // Strip CDN junk like "_BV1xxx.p2.mp4?..." appended by yt-dlp on segmented streams
+            const clean = t.replace(/[_\s]*[\w.-]*\.(?:mp4|flv|mkv|webm|ts|m4s|m3u8)\?.*$/i, "");
+            setMediaTitleOverride(clean || t);
             return;
           }
         } catch (_) {}
