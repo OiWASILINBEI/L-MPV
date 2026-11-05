@@ -1046,6 +1046,16 @@ export interface TranslationDict {
     muted: string;
     /** Скорость воспроизведения, например "1.5x" */
     speed: (value: string) => string;
+    /** Запущен новый файл */
+    nowPlaying: (name: string) => string;
+    /** Переключение аудиодорожки */
+    audioTrack: (name: string) => string;
+    /** Переключение субтитров */
+    subTrack: (name: string) => string;
+    /** Общее состояние «включено» */
+    enabled: string;
+    /** Общее состояние «выключено» */
+    disabled: string;
     ambientMode: (mode: string) => string;
     audioLoaded: (name: string) => string;
     subsLoaded: (name: string) => string;
