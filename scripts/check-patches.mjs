@@ -71,13 +71,12 @@ requirePattern("src/utils/timeFormatUtils.ts", timeFormat, /getTimeFormatOptions
 readFile("bundled/portable-assets/scripts/startup-format-logos.lua");
 readFile("bundled/portable-assets/config/script-modules/startup-logo-bounds.lua");
 readFile("bundled/portable-assets/config/script-assets/startup-format-logos/runtime/manifest.json");
-// mpv 启动时需要扫描 scripts/ 目录，config-dir 已设为 Portable-L-MPV/config
-// Rust 端不应禁掉 mpv 默认的 scripts 扫描
+// Rust 端必须显式加载 Lua 脚本（mpv 不会自动扫 scripts/）
 const mpvManager = readFile("src-tauri/src/mpv_manager.rs");
 if (mpvManager) {
-  forbidPattern("src-tauri/src/mpv_manager.rs", mpvManager,
-    /set_option.*"scripts"/,
-    "显式覆盖 scripts 选项（mpv 默认扫 config-dir/scripts/，保持即可）");
+  requirePattern("src-tauri/src/mpv_manager.rs", mpvManager,
+    /lua_script.*startup-format-logos|startup-format-logos.*lua_script|set_option.*"script".*lua_path/,
+    "Lua 脚本加载（script=startup-format-logos.lua）");
 }
 
 if (failures.length > 0) {
