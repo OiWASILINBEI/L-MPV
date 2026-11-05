@@ -54,6 +54,9 @@ jobs:
       - name: 安装 npm 依赖
         run: npm ci
 
+      - name: 编译前自检（汉化版挂点是否还在）
+        run: node scripts/check-patches.mjs
+
       - name: 下载并解压外部组件 (libmpv-2.dll, ffmpeg.exe, mediainfo.dll)
         shell: pwsh
         run: |
