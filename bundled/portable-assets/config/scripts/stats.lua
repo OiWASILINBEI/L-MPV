@@ -1802,6 +1802,13 @@ for k, page in pairs(pages) do
     -- Key bindings to toggle a specific page, e.g.:
     -- "h script-binding stats/display-page-4-toggle".
     mp.add_key_binding(nil, "display-page-" .. page.idx .. "-toggle", function()
+        if display_timer:is_enabled() and not display_timer.oneshot and curr_page ~= k then
+            -- L-MPV: panel already open -> switch page instead of closing
+            curr_page = k
+            reset_scroll_offsets()
+            print_page(curr_page)
+            return
+        end
         curr_page = k
         process_key_binding(false)
     end, {repeatable=false})

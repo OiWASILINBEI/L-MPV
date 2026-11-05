@@ -1208,6 +1208,15 @@ function App() {
         return;
       }
 
+      // TAB：开关 stats 面板（内置绑定，L-MPV 设置界面不提供 Tab 快捷键）
+      if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && e.code === "Tab") {
+        e.preventDefault();
+        invoke("mpv_command", {
+          command: "script-binding stats/display-stats-toggle",
+        }).catch(() => {});
+        return;
+      }
+
       const inSettings = latestRef.current.showSettings
         && Boolean(target?.closest(".settings-side-panel, .modal--settings"));
       const curHotkeys = latestRef.current.hotkeys;
