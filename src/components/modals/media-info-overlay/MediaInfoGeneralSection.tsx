@@ -23,7 +23,13 @@ export const MediaInfoGeneralSection: React.FC<MediaInfoGeneralSectionProps> = (
   currentPosition,
 }) => {
   const { dict } = useTranslation();
-  const filename = mediaInfo?.path ? mediaInfo.path.split(/[/\\]/).pop() : "—";
+  const rawName = mediaInfo?.path ? mediaInfo.path.split(/[/\\]/).pop() : "—";
+  let filename = rawName;
+  if (rawName && rawName.includes("%")) {
+    try {
+      filename = decodeURIComponent(rawName);
+    } catch (_) {}
+  }
 
   return (
     <div className="media-info__section">
