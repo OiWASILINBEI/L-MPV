@@ -380,6 +380,9 @@
   flex-direction: column;
   background: var(--bg-surface, #0f121a);
   color: var(--text-primary, #e2e8f0);
+  /* Следуем за общим масштабом интерфейса (--ui-scale), поверх — независимый
+     масштаб самого окна (--mi-zoom, задаётся кнопками − / % / + в тулбаре) */
+  zoom: calc(var(--ui-scale) * var(--mi-zoom, 1));
   box-sizing: border-box;
   overflow: hidden;
   user-select: none;
@@ -604,6 +607,61 @@
 .mediainfo-standalone__action-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* ─── Капсула масштаба окна MediaInfo: − 100% + ──── */
+.mediainfo-standalone__zoom-group {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  user-select: none;
+}
+
+.mediainfo-standalone__zoom-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--t-fast) var(--ease-smooth),
+              color var(--t-fast) var(--ease-smooth);
+}
+
+.mediainfo-standalone__zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+}
+
+.mediainfo-standalone__zoom-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+  height: 100%;
+  padding: 0 4px;
+  border: none;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease-smooth);
+}
+
+.mediainfo-standalone__zoom-value:hover {
+  color: var(--text-primary);
 }
 
 .mediainfo-standalone__body {
