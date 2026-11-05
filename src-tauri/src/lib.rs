@@ -214,6 +214,7 @@ pub fn run() {
             commands::seek_preview,
             commands::frame_step,
             commands::mpv_command,
+            commands::mpv_get_property_string,
             commands::frame_back_step,
             commands::playlist_prev,
             commands::playlist_next,

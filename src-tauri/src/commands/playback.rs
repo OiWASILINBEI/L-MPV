@@ -292,6 +292,16 @@ pub fn mpv_command(
     state.mpv.command(&command)
 }
 
+/// 读取 mpv 字符串属性（如 media-title）。
+/// Чтение строкового свойства mpv (например, media-title).
+#[tauri::command]
+pub fn mpv_get_property_string(
+    state: State<'_, PlayerState>,
+    name: String,
+) -> Result<String, String> {
+    state.mpv.get_property_string(&name)
+}
+
 /// Шаг на один кадр назад.
 #[tauri::command]
 pub fn frame_back_step(

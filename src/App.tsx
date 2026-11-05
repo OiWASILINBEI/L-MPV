@@ -177,7 +177,35 @@ function App() {
     };
   }, [showSettings, settingsStyle]);
 
-  const mediaTitle = mediaInfo?.path ? mediaInfo.path.split(/[/\\]/).pop() || "" : "";
+  const [mediaTitleOverride, setMediaTitleOverride] = useState("");
+  useEffect(() => {
+    const p = mediaInfo?.path || "";
+    if (!/^https?:\/\//i.test(p)) {
+      setMediaTitleOverride("");
+      return;
+    }
+    // URL playback: yt-dlp fills media-title asynchronously, poll until resolved.
+    let cancelled = false;
+    let attempts = 0;
+    const poll = async () => {
+      while (!cancelled && attempts < 20) {
+        attempts++;
+        try {
+          const t = await invoke<string>("mpv_get_property_string", { name: "media-title" });
+          if (cancelled) return;
+          if (t && t !== p) {
+            setMediaTitleOverride(t);
+            return;
+          }
+        } catch (_) {}
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    };
+    poll();
+    return () => { cancelled = true; };
+  }, [mediaInfo?.path]);
+
+  const mediaTitle = mediaTitleOverride || (mediaInfo?.path ? mediaInfo.path.split(/[/\\]/).pop() || "" : "");
 
   const clickTimerRef = useRef<number | null>(null);
   const hasMediaRef = useRef(hasMedia);
