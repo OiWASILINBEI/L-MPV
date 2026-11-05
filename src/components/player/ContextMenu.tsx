@@ -95,7 +95,7 @@ export function ContextMenu({
   onShowSubtitlesSearch,
   onShowSettings,
 }: ContextMenuProps) {
-  const { dict } = useTranslation();
+  const { dict, locale } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const closeTimerRef = useRef<number | null>(null);
@@ -672,6 +672,7 @@ export function ContextMenu({
     () =>
       buildContextMenuItems({
         dict,
+        locale,
         menuLayout,
         recentFiles,
         audioTracks,
