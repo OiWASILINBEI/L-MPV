@@ -526,8 +526,9 @@ export function ContextMenu({
 
   const handleToggleShuffle = useCallback(() => {
     invoke("toggle_shuffle").catch(console.error);
+    showOsd(dict.controls.shuffle, { durationMs: 1200 });
     handleClose();
-  }, [handleClose]);
+  }, [handleClose, dict.controls.shuffle]);
 
   const handleClearRecent = useCallback(() => {
     clearRecentFiles();
