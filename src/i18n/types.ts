@@ -1040,6 +1040,12 @@ export interface TranslationDict {
     rotation: (degrees: number) => string;
     zoomReset: string;
     zoomLevel: (pct: number) => string;
+    /** Громкость в процентах */
+    volume: (pct: number) => string;
+    /** Звук выключен (громкость 0) */
+    muted: string;
+    /** Скорость воспроизведения, например "1.5x" */
+    speed: (value: string) => string;
     ambientMode: (mode: string) => string;
     audioLoaded: (name: string) => string;
     subsLoaded: (name: string) => string;
