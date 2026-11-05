@@ -96,8 +96,8 @@ function compareVersions(v1: string, v2: string): number {
  * Форматирование байтов в читаемый вид (КБ / МБ).
  */
 function formatBytes(bytes: number, locale: string = "ru"): string {
-  if (bytes <= 0) return locale === "en" ? "0 B" : "0 Б";
-  const units = locale === "en" ? ["B", "KB", "MB", "GB"] : ["Б", "КБ", "МБ", "ГБ"];
+  if (bytes <= 0) return (locale === "en" || locale === "zh") ? "0 B" : "0 Б";
+  const units = (locale === "en" || locale === "zh") ? ["B", "KB", "MB", "GB"] : ["Б", "КБ", "МБ", "ГБ"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 }
@@ -193,7 +193,7 @@ const VersionPicker: React.FC<VersionPickerProps> = React.memo(({
                 </div>
                 <div className="version-picker-item__meta">
                   {rel.published_at && (
-                    <span>{new Date(rel.published_at).toLocaleDateString(locale === "en" ? "en-US" : "ru-RU")}</span>
+                    <span>{new Date(rel.published_at).toLocaleDateString(locale === "en" ? "en-US" : locale === "zh" ? "zh-CN" : "ru-RU")}</span>
                   )}
                   {isRelSelected && <Check size={13} color="var(--accent, #60a5fa)" />}
                 </div>
