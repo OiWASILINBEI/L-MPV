@@ -122,11 +122,13 @@ jobs:
           New-Item -ItemType Directory -Force -Path "Portable-L-MPV/config/script-modules" | Out-Null
           New-Item -ItemType Directory -Force -Path "Portable-L-MPV/config/script-opts" | Out-Null
           New-Item -ItemType Directory -Force -Path "Portable-L-MPV/config/script-assets" | Out-Null
+          New-Item -ItemType Directory -Force -Path "Portable-L-MPV/config/fonts" | Out-Null
           Copy-Item "$assetRoot/config/scripts/*.lua" -Destination "Portable-L-MPV/config/scripts/" -Force
           Copy-Item "$assetRoot/config/script-modules/startup-logo-bounds.lua" -Destination "Portable-L-MPV/config/script-modules/" -Force
           Copy-Item "$assetRoot/config/script-opts/startup_format_logos.conf" -Destination "Portable-L-MPV/config/script-opts/" -Force
           Copy-Item "$assetRoot/config/script-opts/stats.conf" -Destination "Portable-L-MPV/config/script-opts/" -Force
-          Copy-Item "bundled/yt-dlp/yt-dlp.exe" -Destination "Portable-L-MPV/yt-dlp.exe" -Force
+          Copy-Item "bundled/yt-dlp/yt-dlp.exe" -Destination "Portable-L-MPV/config/yt-dlp.exe" -Force
+          Copy-Item "$assetRoot/config/fonts/*" -Destination "Portable-L-MPV/config/fonts/" -Force
           Copy-Item "$assetRoot/config/script-assets/*" -Destination "Portable-L-MPV/config/script-assets/" -Recurse -Force
           Write-Host "Lua 插件打包完成。"
 

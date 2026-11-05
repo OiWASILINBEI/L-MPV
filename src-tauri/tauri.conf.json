@@ -66,7 +66,8 @@
       "../bundled/portable-assets/config/script-modules/startup-logo-bounds.lua": "config/script-modules/startup-logo-bounds.lua",
       "../bundled/portable-assets/config/script-opts/startup_format_logos.conf": "config/script-opts/startup_format_logos.conf",
       "../bundled/portable-assets/config/script-opts/stats.conf": "config/script-opts/stats.conf",
-      "../bundled/yt-dlp/yt-dlp.exe": "yt-dlp.exe",
+      "../bundled/portable-assets/config/fonts/NotoSansCJK-Bold.ttc": "config/fonts/NotoSansCJK-Bold.ttc",
+      "../bundled/yt-dlp/yt-dlp.exe": "config/yt-dlp.exe",
       "../bundled/portable-assets/config/script-assets": "config/script-assets"
     },
     "icon": [

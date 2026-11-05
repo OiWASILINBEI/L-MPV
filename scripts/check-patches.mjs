@@ -72,7 +72,7 @@ readFile("bundled/portable-assets/config/scripts/startup-format-logos.lua");
 readFile("bundled/portable-assets/config/scripts/stats.lua");
 readFile("bundled/portable-assets/config/script-modules/startup-logo-bounds.lua");
 readFile("bundled/portable-assets/config/script-assets/startup-format-logos/runtime/manifest.json");
-readFile("bundled/portable-assets/config/script-opts/stats.conf");
+const statsConf = readFile("bundled/portable-assets/config/script-opts/stats.conf");
 
 // 7) stats 右键触发链路：Rust 通用命令 + 前端按钮事件
 const playback = readFile("src-tauri/src/commands/playback.rs");
@@ -87,10 +87,12 @@ requirePattern("src-tauri/src/mpv_manager.rs", mpvMgr, /load-stats-overlay/, "�
 // 8) build 6：stats 位置补丁、数字键翻页、链接播放
 const statsLua = readFile("bundled/portable-assets/config/scripts/stats.lua");
 requirePattern("bundled/portable-assets/config/scripts/stats.lua", statsLua, /\\pos\(5\.5,14\)/, "stats 面板位置补丁 pos(5.5,14)");
-requirePattern("src/App.tsx", appTsx, /stats\/display-page-/, "数字键 1~4 转发 stats 翻页");
+requirePattern("src/App.tsx", appTsx, /display-page-\$\{page\}-toggle/, "数字键 1~4 转发 stats 翻页（4 映射轨道信息页）");
 requirePattern("src/App.tsx", appTsx, /clipboard\.readText/, "Ctrl+V 粘贴链接播放");
 requirePattern("src-tauri/src/mpv_manager.rs", mpvMgr, /ytdl_hook-ytdl_path/, "ytdl_hook 指向打包的 yt-dlp");
 readFile("bundled/yt-dlp/yt-dlp.exe");
+readFile("bundled/portable-assets/config/fonts/NotoSansCJK-Bold.ttc");
+requirePattern("bundled/portable-assets/config/script-opts/stats.conf", statsConf, /font=Noto Sans CJK SC/, "stats.conf 默认字体 Noto Sans CJK SC");
 
 if (failures.length > 0) {
   console.error("❌ 编译前自检未通过：上游改动动到了汉化版的挂点，请先修复再编译。");

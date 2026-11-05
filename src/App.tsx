@@ -1199,9 +1199,11 @@ function App() {
       }
 
       // 数字键 1~4：stats 面板翻页（mpv 键盘输入被禁用，由前端转发）
+      // 4 映射到第 5 页（轨道信息），原第 4 页（按键绑定）不绑定数字键
       if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && /^[1-4]$/.test(e.key)) {
+        const page = e.key === "4" ? "5" : e.key;
         invoke("mpv_command", {
-          command: `script-binding stats/display-page-${e.key}`,
+          command: `script-binding stats/display-page-${page}-toggle`,
         }).catch(() => {});
         return;
       }
