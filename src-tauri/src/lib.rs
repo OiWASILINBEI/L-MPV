@@ -213,6 +213,7 @@ pub fn run() {
             commands::seek_absolute,
             commands::seek_preview,
             commands::frame_step,
+            commands::mpv_command,
             commands::frame_back_step,
             commands::playlist_prev,
             commands::playlist_next,

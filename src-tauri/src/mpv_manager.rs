@@ -409,14 +409,6 @@ impl MpvManager {
             Self::set_option(&api, handle, "config", "yes");
             Self::set_option(&api, handle, "config-dir", &config_dir);
 
-            // 加载 bundled Lua 插件（音视频徽章等）
-            // 资源路径用 ~~/ 展开到 config-dir，已在 bundled/portable-assets/config/ 下
-            let lua_script = portable_dir.join("scripts").join("startup-format-logos.lua");
-            if lua_script.exists() {
-                let lua_path = lua_script.to_string_lossy().replace('\\', "/");
-                Self::set_option(&api, handle, "script", &lua_path);
-            }
-
             // Портативные каталоги кэша: GPU-шейдеры и 3D LUT калибровки цвета
             let cache_dir = portable_dir.join("data").join("cache");
             let shader_cache_dir = cache_dir.join("shaders");

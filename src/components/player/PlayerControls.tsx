@@ -1071,6 +1071,13 @@ export function PlayerControls({
           title={dict.controls.mediaInfo}
           aria-label={dict.controls.mediaInfo}
           onClick={handleShowFileInfo}
+          onContextMenu={(e) => {
+            // 右键：切换 stats 统计面板（mpv 内置 stats 占用名字，我们的加载为 stats2）
+            e.preventDefault();
+            invoke("mpv_command", {
+              command: "script-binding stats2/display-stats-toggle",
+            }).catch(() => {});
+          }}
         >
           <Info size={18} />
         </button>

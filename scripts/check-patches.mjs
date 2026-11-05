@@ -67,17 +67,19 @@ readFile("src/i18n/locales/zh.ts");
 const timeFormat = readFile("src/utils/timeFormatUtils.ts");
 requirePattern("src/utils/timeFormatUtils.ts", timeFormat, /getTimeFormatOptions/, "时间格式选项函数");
 
-// 6) 音视频徽章 Lua 插件资产必须存在（startup-format-logos）
-readFile("bundled/portable-assets/scripts/startup-format-logos.lua");
+// 6) Lua 插件资产必须存在（mpv 自动扫 config/scripts/，无需 Rust 显式加载）
+readFile("bundled/portable-assets/config/scripts/startup-format-logos.lua");
+readFile("bundled/portable-assets/config/scripts/stats.lua");
 readFile("bundled/portable-assets/config/script-modules/startup-logo-bounds.lua");
 readFile("bundled/portable-assets/config/script-assets/startup-format-logos/runtime/manifest.json");
-// Rust 端必须显式加载 Lua 脚本（mpv 不会自动扫 scripts/）
-const mpvManager = readFile("src-tauri/src/mpv_manager.rs");
-if (mpvManager) {
-  requirePattern("src-tauri/src/mpv_manager.rs", mpvManager,
-    /lua_script.*startup-format-logos|startup-format-logos.*lua_script|set_option.*"script".*lua_path/,
-    "Lua 脚本加载（script=startup-format-logos.lua）");
-}
+
+// 7) stats 右键触发链路：Rust 通用命令 + 前端按钮事件
+const playback = readFile("src-tauri/src/commands/playback.rs");
+requirePattern("src-tauri/src/commands/playback.rs", playback, /pub fn mpv_command/, "mpv_command 通用命令");
+const libRs = readFile("src-tauri/src/lib.rs");
+requirePattern("src-tauri/src/lib.rs", libRs, /commands::mpv_command/, "mpv_command 注册");
+const playerControls = readFile("src/components/player/PlayerControls.tsx");
+requirePattern("src/components/player/PlayerControls.tsx", playerControls, /stats2\/display-stats-toggle/, "文件信息按钮右键触发 stats");
 
 if (failures.length > 0) {
   console.error("❌ 编译前自检未通过：上游改动动到了汉化版的挂点，请先修复再编译。");

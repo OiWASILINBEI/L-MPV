@@ -1,4 +1,4 @@
-**L-MPV v2.7.0 build 4 · 简体中文汉化版**
+**L-MPV v2.7.0 build 5 · 简体中文汉化版**
 
 本版基于上游 [Menely/L-MPV](https://github.com/Menely/L-MPV) v2.7.0 构建，界面已完整汉化为简体中文。
 
@@ -8,20 +8,28 @@
 
 汉化版的版本号与官方保持完全一致：官方发布 v2.7.0，汉化版就叫 v2.7.0；官方发布 v2.7.1，汉化版就叫 v2.7.1。
 
-只有我们自己修改汉化版时，才在版本号后面追加构建序号，按修改次数递增：v2.7.0 build 1、v2.7.0 build 2、v2.7.0 build 3、v2.7.0 build 4……
+只有我们自己修改汉化版时，才在版本号后面追加构建序号，按修改次数递增：v2.7.0 build 1、build 2、build 3、build 4、build 5……
 
 官方发布新版本时，我们把官方新功能合并进来并重新汉化，版本号重新回到官方号（例如 v2.7.1），构建序号从 build 1 重新开始。
 
-本版是 v2.7.0 的第四次汉化修复，因此命名为 v2.7.0 build 4。
+本版是 v2.7.0 的第五次汉化修改，因此命名为 v2.7.0 build 5。
 
 ---
 
 **🔧 本版改动**
 
-- **新增：音视频徽章（startup-format-logos）**
-  打开视频时右上角会自动显示视频制式（Dolby Vision / HDR10+ / HDR10 / HLG / SDR）和音频格式（Dolby Atmos / DTS:X / DTS-HD MA / Dolby TrueHD / FLAC / AAC 等）的彩色徽章，带淡入淡出动画。徽章会自动识别 4K / 1080p 分辨率选择合适尺寸、自动跳过片头片尾的黑边区域保持位置对齐，切换音轨时徽章自动更新。这是 mpv 社区的经典 Lua 脚本，原版由 [yosh-wang](https://github.com/yosh-wang/mpv-startup-format-logos) 制作，我们直接打包进汉化版，打开即用，无需额外安装。
+- **新增：stats 统计面板（v30.0.0），右键触发**
+  底部控制栏的「文件信息」按钮（ⓘ 图标）：左键点击照旧弹出媒体信息窗口，**右键点击**弹出 stats 统计面板（分辨率、帧率、码率、解码器、缓存等实时信息），再右键一次关闭。打包的是 mpv 社区 stats.lua v30.0.0 新版。
 
-  徽章默认启用。如需关闭，可在 `config/script-opts/startup_format_logos.conf` 里把 `enabled = true` 改成 `enabled = false`，或者用 mpv 快捷键绑定脚本消息（详见原版仓库说明）。
+- **徽章默认改为白色、停留 20 秒**
+  音视频徽章默认样式由彩色改为白色（`style=white`），显示时长由 4 秒改为 20 秒（`hold=20.0`）。仍可在 `config/script-opts/startup_format_logos.conf` 自行调整。
+
+- **Lua 插件加载方式简化**
+  徽章与 stats 统一放入 `config/scripts/` 目录由 mpv 自动加载，移除了 Rust 端的手动挂载代码，行为与原版 mpv 完全一致。
+
+**🐛 build 4 已包含的内容**
+
+- 新增音视频徽章（startup-format-logos）：打开视频时右上角显示制式与音频格式徽章。
 
 **🐛 build 3 已包含的修复**
 
@@ -43,13 +51,14 @@
 - 快捷键名称中文化（左键 / 右键 / 中键 / 空格 等），右键菜单提示同步中文
 - 编译流程全中文：自动构建日志、步骤名称、发布说明均为中文
 - 音视频徽章（startup-format-logos）原生内置
+- stats 统计面板（v30.0.0）原生内置，右键「文件信息」按钮触发
 
 ---
 
 **📥 下载与安装**
 
 首次安装（二选一）：
-1. **便携版**：下载 `L-MPV-v2.7.0-build4-portable.zip`，解压到任意文件夹（例如 `D:\L-MPV`），双击 `l-mpv.exe` 即可运行，不写注册表。
+1. **便携版**：下载 `L-MPV-v2.7.0-build5-portable.zip`，解压到任意文件夹（例如 `D:\L-MPV`），双击 `l-mpv.exe` 即可运行，不写注册表。
 2. **安装版**：下载 `L-MPV_2.7.0_x64-setup.exe`，双击按提示安装。
 
 已有旧版：直接下载新版覆盖即可，个人设置与播放记录都会保留。

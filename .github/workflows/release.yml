@@ -116,17 +116,17 @@ jobs:
           Copy-Item "src-tauri/binaries/ffmpeg.exe" -Destination "Portable-L-MPV/ffmpeg.exe" -Force
           Copy-Item "src-tauri/binaries/mediainfo.dll" -Destination "Portable-L-MPV/mediainfo.dll" -Force
 
-          Write-Host "正在打包音视频徽章 Lua 插件 (startup-format-logos)..."
+          Write-Host "正在打包 Lua 插件 (startup-format-logos + stats)..."
           $assetRoot = "bundled/portable-assets"
-          New-Item -ItemType Directory -Force -Path "Portable-L-MPV/scripts" | Out-Null
+          New-Item -ItemType Directory -Force -Path "Portable-L-MPV/config/scripts" | Out-Null
           New-Item -ItemType Directory -Force -Path "Portable-L-MPV/config/script-modules" | Out-Null
           New-Item -ItemType Directory -Force -Path "Portable-L-MPV/config/script-opts" | Out-Null
           New-Item -ItemType Directory -Force -Path "Portable-L-MPV/config/script-assets" | Out-Null
-          Copy-Item "$assetRoot/scripts/startup-format-logos.lua" -Destination "Portable-L-MPV/scripts/" -Force
+          Copy-Item "$assetRoot/config/scripts/*.lua" -Destination "Portable-L-MPV/config/scripts/" -Force
           Copy-Item "$assetRoot/config/script-modules/startup-logo-bounds.lua" -Destination "Portable-L-MPV/config/script-modules/" -Force
           Copy-Item "$assetRoot/config/script-opts/startup_format_logos.conf" -Destination "Portable-L-MPV/config/script-opts/" -Force
           Copy-Item "$assetRoot/config/script-assets/*" -Destination "Portable-L-MPV/config/script-assets/" -Recurse -Force
-          Write-Host "音视频徽章插件打包完成。"
+          Write-Host "Lua 插件打包完成。"
 
           Write-Host "正在生成完整性清单 checksums.json..."
           Push-Location src-tauri

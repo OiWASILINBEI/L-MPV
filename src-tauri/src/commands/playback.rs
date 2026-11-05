@@ -282,6 +282,16 @@ pub fn frame_step(
     invalidate_ambient_result(&state, result)
 }
 
+/// 通用 mpv 命令透传：用于从前端触发 Lua 脚本绑定（如 stats 面板）。
+/// Универсальный мост mpv-команд: триггерит Lua script-binding из фронтенда.
+#[tauri::command]
+pub fn mpv_command(
+    state: State<'_, PlayerState>,
+    command: String,
+) -> Result<(), String> {
+    state.mpv.command(&command)
+}
+
 /// Шаг на один кадр назад.
 #[tauri::command]
 pub fn frame_back_step(
