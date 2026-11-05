@@ -385,14 +385,15 @@ export function isCodeReservedForUpscaleOff(code: string, actionId: string): boo
 
 function formatSingleKey(part: string, locale?: string): string {
   if (!part) return "";
-  const isEn = locale === "en";
-  if (part === "MouseLeft") return isEn ? "LMB" : "ЛКМ";
-  if (part === "MouseRight") return isEn ? "RMB" : "ПКМ";
-  if (part === "MouseMiddle") return isEn ? "MMB" : "СКМ";
-  if (part === "MouseLeftDoubleClick") return isEn ? "2x LMB" : "ЛКМ 2x";
-  
+  const isZh = locale === "zh";
+  const isEn = locale === "en" || isZh;
+  if (part === "MouseLeft") return isZh ? "左键" : isEn ? "LMB" : "ЛКМ";
+  if (part === "MouseRight") return isZh ? "右键" : isEn ? "RMB" : "ПКМ";
+  if (part === "MouseMiddle") return isZh ? "中键" : isEn ? "MMB" : "СКМ";
+  if (part === "MouseLeftDoubleClick") return isZh ? "双击左键" : isEn ? "2x LMB" : "ЛКМ 2x";
+
   if (part.startsWith("MouseButton")) {
-    return (isEn ? "Mouse " : "Мышь ") + part.replace("MouseButton", "");
+    return (isZh ? "鼠标 " : isEn ? "Mouse " : "Мышь ") + part.replace("MouseButton", "");
   }
   if (part.startsWith("Key")) {
     return part.replace("Key", "");
@@ -400,7 +401,7 @@ function formatSingleKey(part: string, locale?: string): string {
   if (part.startsWith("Digit")) {
     return part.replace("Digit", "");
   }
-  if (part === "Space") return isEn ? "Space" : "Пробел";
+  if (part === "Space") return isZh ? "空格" : isEn ? "Space" : "Пробел";
   if (part === "ArrowLeft") return "←";
   if (part === "ArrowRight") return "→";
   if (part === "ArrowUp") return "↑";
