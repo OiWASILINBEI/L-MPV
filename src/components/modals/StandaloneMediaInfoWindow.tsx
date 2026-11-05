@@ -19,7 +19,7 @@ import {
   Pin,
   FileUp,
 } from "lucide-react";
-import { parseMediaInfoLines } from "../../utils/mediaInfoParser";
+import { parseMediaInfoLines, MediaInfoLang } from "../../utils/mediaInfoParser";
 import {
   CategoryKey,
   buildCategoryTabs,
@@ -58,7 +58,45 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<CategoryKey>("all");
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
-  const [useRussian, setUseRussian] = useState<boolean>(() => getEffectiveLocale() === "ru");
+  const [lang, setLang] = useState<MediaInfoLang>(() => getEffectiveLocale());
+  // Хелпер выбора строки по текущему языку (ru / en / zh)
+  const L = useCallback((ru: string, en: string, zh: string) => (lang === "ru" ? ru : lang === "zh" ? zh : en), [lang]);
+
+  // Независимый масштаб окна MediaInfo — применяется поверх общего --ui-scale.
+  // Хранится в localStorage, чтобы окно запоминало предпочтение пользователя.
+  const [miZoom, setMiZoom] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem("l-mpv-mediainfo-zoom");
+      const v = raw ? parseFloat(raw) : 1;
+      return Number.isFinite(v) && v > 0 ? v : 1;
+    } catch {
+      return 1;
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--mi-zoom", String(miZoom));
+    try {
+      localStorage.setItem("l-mpv-mediainfo-zoom", String(miZoom));
+    } catch {
+      // localStorage недоступен
+    }
+  }, [miZoom]);
+
+  // Общий масштаб интерфейса (для показа итогового процента в тулбаре)
+  const uiScale = useMemo(() => {
+    try {
+      const mode = localStorage.getItem("l-mpv-ui-scale-mode") || "auto";
+      const value = parseFloat(localStorage.getItem("l-mpv-ui-scale-value") || "1");
+      return mode === "manual" && Number.isFinite(value) && value > 0 ? value : 1;
+    } catch {
+      return 1;
+    }
+  }, []);
+
+  const adjustMiZoom = useCallback((delta: number) => {
+    setMiZoom((z) => Math.min(2, Math.max(0.7, Math.round((z + delta) * 100) / 100)));
+  }, []);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [copied, setCopied] = useState<boolean>(false);
   const [copiedSectionId, setCopiedSectionId] = useState<string | null>(null);
@@ -273,13 +311,13 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
   // Парсинг и структурирование отчёта по секциям
   const baseReport = useMemo(() => {
     if (!data?.text) return { rawText: "", cleanText: "", lines: [], sections: [] };
-    return parseMediaInfoLines(data.text, useRussian);
-  }, [data?.text, useRussian]);
+    return parseMediaInfoLines(data.text, lang);
+  }, [data?.text, lang]);
 
   // Список доступных интерактивных чипов-вкладок (только непустые)
   const categoryTabs = useMemo(() => {
-    return buildCategoryTabs(baseReport.sections, useRussian);
-  }, [baseReport.sections, useRussian]);
+    return buildCategoryTabs(baseReport.sections, lang);
+  }, [baseReport.sections, lang]);
 
   // Фильтрация и подсветка поиска по свойствам категорий
   const displaySections = useMemo(() => {
@@ -391,12 +429,14 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
           <div className="mediainfo-standalone__drag-box">
             <FileUp size={44} className="mediainfo-standalone__drag-icon" />
             <span className="mediainfo-standalone__drag-title">
-              {useRussian ? "Отпустите медиафайл для анализа" : "Drop media file to analyze"}
+              {L("Отпустите медиафайл для анализа", "Drop media file to analyze", "松开以分析媒体文件")}
             </span>
             <span className="mediainfo-standalone__drag-sub">
-              {useRussian
-                ? "L-MPV мгновенно сформирует отчёт MediaInfo"
-                : "L-MPV will instantly analyze media container properties"}
+              {L(
+                "L-MPV мгновенно сформирует отчёт MediaInfo",
+                "L-MPV will instantly analyze media container properties",
+                "L-MPV 将立即分析媒体容器属性"
+              )}
             </span>
           </div>
         </div>
@@ -432,8 +472,8 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
             className={`mediainfo-standalone__control-btn ${isAlwaysOnTop ? "mediainfo-standalone__control-btn--active" : ""}`}
             aria-label={
               isAlwaysOnTop
-                ? (useRussian ? "Открепить от верха окон" : "Unpin from top")
-                : (useRussian ? "Закрепить поверх всех окон" : "Keep on top")
+                ? L("Открепить от верха окон", "Unpin from top", "取消窗口置顶")
+                : L("Закрепить поверх всех окон", "Keep on top", "窗口置顶")
             }
             onClick={handleToggleAlwaysOnTop}
           >
@@ -442,7 +482,7 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
           <button
             type="button"
             className="mediainfo-standalone__control-btn"
-            aria-label={useRussian ? "Свернуть" : "Minimize"}
+            aria-label={L("Свернуть", "Minimize", "最小化")}
             onClick={handleMinimize}
           >
             <Minus size={13} />
@@ -450,7 +490,7 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
           <button
             type="button"
             className="mediainfo-standalone__control-btn"
-            aria-label={isMaximized ? (useRussian ? "Восстановить" : "Restore") : (useRussian ? "Развернуть" : "Maximize")}
+            aria-label={isMaximized ? L("Восстановить", "Restore", "还原") : L("Развернуть", "Maximize", "最大化")}
             onClick={handleToggleMaximize}
           >
             {isMaximized ? <Minimize2 size={12} /> : <Square size={11} />}
@@ -458,7 +498,7 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
           <button
             type="button"
             className="mediainfo-standalone__control-btn mediainfo-standalone__control-btn--close"
-            aria-label={useRussian ? "Закрыть" : "Close"}
+            aria-label={L("Закрыть (Esc)", "Close (Esc)", "关闭 (Esc)")}
             onClick={handleClose}
           >
             <X size={14} />
@@ -474,20 +514,20 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
             ref={searchInputRef}
             type="text"
             className="mediainfo-standalone__search-input"
-            placeholder={useRussian ? "Поиск по свойствам... (Ctrl+F)" : "Search properties... (Ctrl+F)"}
+            placeholder={L("Поиск по свойствам... (Ctrl+F)", "Search properties... (Ctrl+F)", "搜索属性... (Ctrl+F)")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
           {searchQuery && (
             <div className="mediainfo-standalone__search-stats">
               <span className="mediainfo-standalone__search-count">
-                {matchCount} {useRussian ? "совп." : "matches"}
+                {matchCount} {L("совп.", "matches", "个匹配")}
               </span>
               <button
                 type="button"
                 className="mediainfo-standalone__btn-icon"
-                title={useRussian ? "Очистить поиск" : "Clear search"}
-                aria-label={useRussian ? "Очистить поиск" : "Clear search"}
+                title={L("Очистить поиск", "Clear search", "清除搜索")}
+                aria-label={L("Очистить поиск", "Clear search", "清除搜索")}
                 onClick={() => setSearchQuery("")}
               >
                 <X size={12} />
@@ -497,22 +537,49 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
         </div>
 
         <div className="mediainfo-standalone__actions">
+          <div className="mediainfo-standalone__zoom-group">
+            <button
+              type="button"
+              className="mediainfo-standalone__zoom-btn"
+              title={L("Уменьшить масштаб окна", "Zoom out (this window only)", "缩小窗口字号（仅此窗口）")}
+              onClick={() => adjustMiZoom(-0.05)}
+              >
+              −
+            </button>
+            <button
+              type="button"
+              className="mediainfo-standalone__zoom-value"
+              title={L("Сбросить масштаб до общего", "Reset zoom to interface scale", "重置为与界面缩放一致")}
+              onClick={() => setMiZoom(1)}
+              >
+              {Math.round(uiScale * miZoom * 100)}%
+            </button>
+            <button
+              type="button"
+              className="mediainfo-standalone__zoom-btn"
+              title={L("Увеличить масштаб окна", "Zoom in (this window only)", "放大窗口字号（仅此窗口）")}
+              onClick={() => adjustMiZoom(0.05)}
+              >
+              +
+            </button>
+          </div>
+
           <button
             type="button"
-            className={`mediainfo-standalone__action-btn ${useRussian ? "mediainfo-standalone__action-btn--active" : ""}`}
-            title={useRussian ? "Переключить язык (Русский / Английский)" : "Switch language (Russian / English)"}
-            aria-label={useRussian ? "Переключить язык (Русский / Английский)" : "Switch language (Russian / English)"}
-            onClick={() => setUseRussian(!useRussian)}
+            className={`mediainfo-standalone__action-btn ${lang !== "en" ? "mediainfo-standalone__action-btn--active" : ""}`}
+            title={L("Переключить язык (Русский / Английский / Китайский)", "Switch language (Russian / English / Chinese)", "切换语言（Русский / English / 中文）")}
+            aria-label={L("Переключить язык (Русский / Английский / Китайский)", "Switch language (Russian / English / Chinese)", "切换语言（Русский / English / 中文）")}
+            onClick={() => setLang((p) => (p === "ru" ? "en" : p === "en" ? "zh" : "ru"))}
           >
             <Languages size={13} />
-            <span>{useRussian ? "RU" : "EN"}</span>
+            <span>{lang === "ru" ? "RU" : lang === "zh" ? "中文" : "EN"}</span>
           </button>
 
           <button
             type="button"
             className="mediainfo-standalone__action-btn mediainfo-standalone__action-btn--icon"
-            title={useRussian ? (copied ? "Скопировано!" : "Копировать отчёт в буфер") : (copied ? "Copied!" : "Copy report to clipboard")}
-            aria-label={useRussian ? (copied ? "Скопировано!" : "Копировать отчёт в буфер") : (copied ? "Copied!" : "Copy report to clipboard")}
+            title={L(copied ? "Скопировано!" : "Копировать отчёт в буфер", copied ? "Copied!" : "Copy report to clipboard", copied ? "已复制！" : "复制报告到剪贴板")}
+            aria-label={L(copied ? "Скопировано!" : "Копировать отчёт в буфер", copied ? "Copied!" : "Copy report to clipboard", copied ? "已复制！" : "复制报告到剪贴板")}
             onClick={handleCopy}
             disabled={!baseReport.rawText}
           >
@@ -522,8 +589,8 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
           <button
             type="button"
             className="mediainfo-standalone__action-btn mediainfo-standalone__action-btn--icon"
-            title={useRussian ? "Экспорт в .txt" : "Export to .txt"}
-            aria-label={useRussian ? "Экспорт в .txt" : "Export to .txt"}
+            title={L("Экспорт в .txt", "Export to .txt", "导出为 .txt")}
+            aria-label={L("Экспорт в .txt", "Export to .txt", "导出为 .txt")}
             onClick={handleExportTxt}
             disabled={!baseReport.rawText}
           >
@@ -540,7 +607,7 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
           onSelectCategory={setActiveCategory}
           areAllCollapsed={areAllCollapsed}
           onToggleCollapseAll={toggleCollapseAll}
-          useRussian={useRussian}
+          lang={lang}
         />
       )}
 
@@ -549,7 +616,7 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
         {loading && (
           <div className="mediainfo-standalone__center-state">
             <Loader2 className="mediainfo-standalone__spinner" size={24} />
-            <span>{useRussian ? "Анализ медиаконтейнера..." : "Analyzing media container..."}</span>
+            <span>{L("Анализ медиаконтейнера...", "Analyzing media container...", "正在分析媒体容器...")}</span>
           </div>
         )}
 
@@ -558,13 +625,13 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
             <AlertCircle size={24} />
             <span>
               {error === "NO_PATH"
-                ? (useRussian ? "Путь к файлу не передан" : "File path not specified")
+                ? L("Путь к файлу не передан", "File path not specified", "未指定文件路径")
                 : error === "NO_FILE"
-                ? (useRussian ? "Файл для анализа не указан" : "No file specified for analysis")
+                ? L("Файл для анализа не указан", "No file specified for analysis", "未指定要分析的文件")
                 : error === "INIT_ERROR"
-                ? (useRussian ? "Ошибка инициализации окна MediaInfo" : "MediaInfo window initialization error")
+                ? L("Ошибка инициализации окна MediaInfo", "MediaInfo window initialization error", "MediaInfo 窗口初始化错误")
                 : error === "DLL_ERROR"
-                ? (useRussian ? "Не удалось проанализировать файл с помощью MediaInfo.dll" : "Failed to analyze file with MediaInfo.dll")
+                ? L("Не удалось проанализировать файл с помощью MediaInfo.dll", "Failed to analyze file with MediaInfo.dll", "无法使用 MediaInfo.dll 分析文件")
                 : error}
             </span>
             {filePath && (
@@ -574,7 +641,7 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
                 onClick={() => loadMediaInfoForPath(filePath)}
               >
                 <RefreshCw size={12} />
-                <span>{useRussian ? "Повторить анализ" : "Retry analysis"}</span>
+                <span>{L("Повторить анализ", "Retry analysis", "重试分析")}</span>
               </button>
             )}
           </div>
@@ -587,7 +654,7 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
             onToggleSection={toggleSection}
             onCopySection={handleCopySection}
             copiedSectionId={copiedSectionId}
-            useRussian={useRussian}
+            lang={lang}
           />
         )}
       </div>
