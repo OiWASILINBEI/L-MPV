@@ -436,10 +436,11 @@ export function ContextMenu({
     try {
       await invoke("set_speed", { speed });
       setCurrentSpeed(speed);
+      showOsd(dict.osd.speed(`${Math.round(speed * 100) / 100}x`));
     } catch (e) {
       console.error("Ошибка установки скорости воспроизведения:", e);
     }
-  }, []);
+  }, [dict.osd.speed]);
 
   const handleSetFrameMode = useCallback(async (mode: "stretch" | "fit" | "fill") => {
     try {
@@ -461,10 +462,11 @@ export function ContextMenu({
     try {
       await invoke("set_rotation", { degrees });
       setCurrentRotation(degrees);
+      showOsd(dict.osd.rotation(degrees));
     } catch (e) {
       console.error("Ошибка установки поворота видео:", e);
     }
-  }, []);
+  }, [dict.osd.rotation]);
 
   const handleSetAmbientMode = useCallback(async (mode: AmbientMode) => {
     try {
