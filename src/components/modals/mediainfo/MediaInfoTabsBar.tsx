@@ -1,6 +1,7 @@
 import React from "react";
 import { ChevronsUpDown } from "lucide-react";
 import { CategoryKey, MediaInfoCategoryTab } from "./mediaInfoTypes";
+import { MediaInfoLang } from "../../../utils/mediaInfoParser";
 
 interface MediaInfoTabsBarProps {
   tabs: MediaInfoCategoryTab[];
@@ -8,7 +9,7 @@ interface MediaInfoTabsBarProps {
   onSelectCategory: (category: CategoryKey) => void;
   areAllCollapsed: boolean;
   onToggleCollapseAll: () => void;
-  useRussian: boolean;
+  lang: MediaInfoLang;
   style?: React.CSSProperties;
 }
 
@@ -18,9 +19,10 @@ export const MediaInfoTabsBar: React.FC<MediaInfoTabsBarProps> = React.memo(({
   onSelectCategory,
   areAllCollapsed,
   onToggleCollapseAll,
-  useRussian,
+  lang,
   style,
 }) => {
+  const L = (ru: string, en: string, zh: string) => (lang === "ru" ? ru : lang === "zh" ? zh : en);
   if (tabs.length <= 1) return null;
 
   return (
@@ -52,8 +54,8 @@ export const MediaInfoTabsBar: React.FC<MediaInfoTabsBarProps> = React.memo(({
         <ChevronsUpDown size={12} />
         <span>
           {areAllCollapsed
-            ? useRussian ? "Развернуть" : "Expand"
-            : useRussian ? "Свернуть" : "Collapse"}
+            ? L("Развернуть", "Expand", "展开")
+            : L("Свернуть", "Collapse", "折叠")}
         </span>
       </button>
     </div>
