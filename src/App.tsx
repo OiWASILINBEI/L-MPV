@@ -1187,6 +1187,25 @@ function App() {
         return;
       }
 
+      // Ctrl+V：剪贴板是 http(s) 链接则直接播放
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.code === "KeyV") {
+        navigator.clipboard.readText().then((text) => {
+          const url = (text || "").trim();
+          if (/^https?:\/\/\S+$/i.test(url)) {
+            invoke("open_file", { path: url }).catch(() => {});
+          }
+        }).catch(() => {});
+        return;
+      }
+
+      // 数字键 1~4：stats 面板翻页（mpv 键盘输入被禁用，由前端转发）
+      if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && /^[1-4]$/.test(e.key)) {
+        invoke("mpv_command", {
+          command: `script-binding stats/display-page-${e.key}`,
+        }).catch(() => {});
+        return;
+      }
+
       const inSettings = latestRef.current.showSettings
         && Boolean(target?.closest(".settings-side-panel, .modal--settings"));
       const curHotkeys = latestRef.current.hotkeys;

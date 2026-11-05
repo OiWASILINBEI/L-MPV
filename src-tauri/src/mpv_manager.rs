@@ -413,6 +413,14 @@ impl MpvManager {
             // 这样才能读到 script-opts/stats.conf，且绑定名为 stats/display-stats-toggle
             Self::set_option(&api, handle, "load-stats-overlay", "no");
 
+            // 链接播放：把打包的 yt-dlp.exe 指给 ytdl_hook
+            let ytdlp = portable_dir.join("yt-dlp.exe");
+            if ytdlp.exists() {
+                let ytdlp_path = ytdlp.to_string_lossy().replace('\\', "/");
+                let opt = format!("ytdl_hook-ytdl_path={}", ytdlp_path);
+                Self::set_option(&api, handle, "script-opts-append", &opt);
+            }
+
             // Портативные каталоги кэша: GPU-шейдеры и 3D LUT калибровки цвета
             let cache_dir = portable_dir.join("data").join("cache");
             let shader_cache_dir = cache_dir.join("shaders");

@@ -84,6 +84,15 @@ requirePattern("src/components/player/PlayerControls.tsx", playerControls, /stat
 const mpvMgr = readFile("src-tauri/src/mpv_manager.rs");
 requirePattern("src-tauri/src/mpv_manager.rs", mpvMgr, /load-stats-overlay/, "内置 stats 禁用（让位给 v30）");
 
+// 8) build 6：stats 位置补丁、数字键翻页、链接播放
+const statsLua = readFile("bundled/portable-assets/config/scripts/stats.lua");
+requirePattern("bundled/portable-assets/config/scripts/stats.lua", statsLua, /\\pos\(5\.5,14\)/, "stats 面板位置补丁 pos(5.5,14)");
+const appTsx = readFile("src/App.tsx");
+requirePattern("src/App.tsx", appTsx, /stats\/display-page-/, "数字键 1~4 转发 stats 翻页");
+requirePattern("src/App.tsx", appTsx, /clipboard\.readText/, "Ctrl+V 粘贴链接播放");
+requirePattern("src-tauri/src/mpv_manager.rs", mpvMgr, /ytdl_hook-ytdl_path/, "ytdl_hook 指向打包的 yt-dlp");
+readFile("bundled/yt-dlp/yt-dlp.exe");
+
 if (failures.length > 0) {
   console.error("❌ 编译前自检未通过：上游改动动到了汉化版的挂点，请先修复再编译。");
   for (const item of failures) {

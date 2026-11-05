@@ -203,7 +203,7 @@ local function text_style()
     if o.custom_header and o.custom_header ~= "" then
         return o.custom_header
     else
-        local style = "{\\r\\an7\\fs" .. font_size .. "\\bord" .. border_size
+        local style = "{\\r\\an7\\pos(5.5,14)\\fs" .. font_size .. "\\bord" .. border_size
 
         if o.font ~= "" then
             style = style .. "\\fn" .. o.font
