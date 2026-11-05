@@ -194,6 +194,7 @@ export const ru: TranslationDict = {
         "Выберите язык отображения элементов управления и настроек плеера.",
       languageRu: "Русский",
       languageEn: "English",
+      languageZh: "中文",
       // Контекстное меню
       contextMenuSection: "Контекстное меню",
       // Настройки видео и аудио
@@ -1182,7 +1183,8 @@ export const ru: TranslationDict = {
     title: "MediaInfo",
     dragHeader: "Зажмите и перетаскивайте окно по плееру",
     langTooltipRu: "Язык: Русский (нажмите для переключения на EN)",
-    langTooltipEn: "Язык: English (нажмите для RU)",
+    langTooltipEn: "Язык: English (нажмите для переключения на 中文)",
+    langTooltipZh: "Язык: 中文 (нажмите для переключения на RU)",
     copyReport: "Скопировать отчёт в буфер обмена",
     exportTxt: "Сохранить в файл .txt",
     close: "Закрыть (Esc)",
