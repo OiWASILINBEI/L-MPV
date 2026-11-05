@@ -187,8 +187,6 @@ function App() {
   const videoPanXRef = useRef<number>(0);
   const videoPanYRef = useRef<number>(0);
   const rafIdRef = useRef<number | null>(null);
-  const videoDragRef = useRef<{ startX: number; startY: number; moved: boolean } | null>(null);
-  const suppressVideoClickRef = useRef(false);
 
 
   useEffect(() => {
@@ -1047,11 +1045,7 @@ function App() {
   const handleVideoClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.button !== 0) return;
-      // Клик, завершивший перетаскивание окна, не должен переключать паузу/полный экран
-      if (suppressVideoClickRef.current) {
-        suppressVideoClickRef.current = false;
-        return;
-      }
+      // Клик, завершивший перетаскивание окна, гасится в src/zh-cn/drag.ts
       closeContextMenu();
       if (latestRef.current.isPlaylistOpen) {
         latestRef.current.setIsPlaylistOpen(false);
@@ -1164,31 +1158,7 @@ function App() {
     [executeAction]
   );
 
-  // ─── Перетаскивание окна за видеополотно (левая кнопка мыши) ───
-  const handleVideoMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    suppressVideoClickRef.current = false;
-    videoDragRef.current = { startX: e.clientX, startY: e.clientY, moved: false };
-  }, []);
-
-  const handleVideoMouseMove = useCallback((e: React.MouseEvent) => {
-    const drag = videoDragRef.current;
-    if (!drag || drag.moved) return;
-    if ((e.buttons & 1) === 0 || latestRef.current.isFullscreen) return;
-    if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < 6) return;
-    drag.moved = true;
-    // Подавляем последующий клик, иначе после перетаскивания сработает пауза
-    suppressVideoClickRef.current = true;
-    if (clickTimerRef.current !== null) {
-      window.clearTimeout(clickTimerRef.current);
-      clickTimerRef.current = null;
-    }
-    getCurrentWindow().startDragging().catch(console.error);
-  }, []);
-
-  const handleVideoMouseUp = useCallback(() => {
-    videoDragRef.current = null;
-  }, []);
+  // ─── Перетаскивание окна за видеополотно реализовано в src/zh-cn/drag.ts ───
 
   useEffect(() => {
     const updateHotkeys = () => setHotkeys(getCustomHotkeys());
@@ -1369,10 +1339,6 @@ function App() {
       <div
         className={`video-area ${!hasMedia ? "video-area--empty" : ""}`}
         data-tauri-drag-region={undefined}
-        onMouseDown={handleVideoMouseDown}
-        onMouseMove={handleVideoMouseMove}
-        onMouseUp={handleVideoMouseUp}
-        onMouseLeave={handleVideoMouseUp}
         onClick={handleVideoClick}
         onContextMenu={handleVideoContextMenu}
         onAuxClick={handleVideoAuxClick}
