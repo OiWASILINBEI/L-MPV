@@ -55,7 +55,7 @@ import {
   getSavedTimeFormat,
   saveTimeFormat,
   getNextTimeFormat,
-  TIME_FORMAT_OPTIONS,
+  getTimeFormatOptions,
 } from "../../utils/timeFormatUtils";
 import {
   ControlBarStyle,
@@ -239,7 +239,7 @@ export function PlayerControls({
     const nextFormat = getNextTimeFormat(timeFormat);
     setTimeFormat(nextFormat);
     saveTimeFormat(nextFormat);
-    const option = TIME_FORMAT_OPTIONS.find((opt) => opt.id === nextFormat);
+    const option = getTimeFormatOptions().find((opt) => opt.id === nextFormat);
     showOsd(dict.osd.timeFormat(option?.label || nextFormat));
   }, [timeFormat, dict]);
 
