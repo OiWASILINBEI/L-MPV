@@ -43,7 +43,7 @@ import type {
 } from "../heatmap";
 import { BUILT_IN_PRESETS } from "../../../utils/presetsUtils";
 import { TIME_POSITION_OPTIONS } from "../../../utils/timePositionUtils";
-import { TIME_FORMAT_OPTIONS } from "../../../utils/timeFormatUtils";
+import { getTimeFormatOptions } from "../../../utils/timeFormatUtils";
 import { CONTROL_BAR_STYLE_OPTIONS } from "../../../utils/controlBarStyleUtils";
 import { getKeyDisplay } from "../../../utils/hotkeyUtils";
 import { truncateMiddle } from "../../../utils/textUtils";
@@ -684,7 +684,7 @@ export function buildContextMenuItems(params: ContextMenuBuilderParams): MenuIte
       label: dict.settings.cmenuUI.timeFmt,
       children: [
         { type: "header" as const, label: dict.settings.cmenuUI.groupTimeFmt },
-        ...TIME_FORMAT_OPTIONS.map((fmtOption) => {
+        ...getTimeFormatOptions().map((fmtOption) => {
           const fmtLabelMap: Record<string, string> = {
             elapsed_total: dict.settings.cmenuUI.fmtElapsedTotal,
             elapsed_remaining: dict.settings.cmenuUI.fmtElapsedRemaining,
