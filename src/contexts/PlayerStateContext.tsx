@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save } from "@tauri-apps/plugin-dialog";
 import { getDict, getEffectiveLocale } from "../i18n";
+import { showOsd } from "../hooks/useOsd";
 
 export interface PlaylistItem {
   index: number;
@@ -892,6 +893,8 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem("l-mpv-volume", vol.toString());
       invoke("set_volume", { volume: vol });
+      const d = getDict(getEffectiveLocale());
+      showOsd(vol === 0 ? d.osd.muted : d.osd.volume(vol));
     } catch (e) {
       console.error(e);
     }
