@@ -73,7 +73,7 @@ interface AppearanceSettingsTabProps {
 import { useTranslation } from "../../../i18n/LanguageContext";
 
 export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
-  const { dict } = useTranslation();
+  const { dict, locale } = useTranslation();
   const {
     uiRadius, saveUiRadius, setUiRadius,
     uiScale, saveUiScale, setUiScale,
@@ -941,7 +941,7 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
 
                             {/* 4 компактные сегментные кнопки с примерами тайминга */}
                             <div className="time-format-compact-grid">
-                              {getTimeFormatOptions().map((formatOption) => {
+                              {getTimeFormatOptions(locale).map((formatOption) => {
                                 const isSel = timeFormat === formatOption.id;
                                 return (
                                   <button
