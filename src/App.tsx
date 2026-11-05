@@ -812,9 +812,9 @@ function App() {
         break;
       }
       case "toggleLanguage": {
-        const nextLocale: Locale = curLocale === "ru" ? "en" : "ru";
+        const nextLocale: Locale = curLocale === "ru" ? "en" : curLocale === "en" ? "zh" : "ru";
         saveLocale(nextLocale);
-        const langName = nextLocale === "ru" ? "Русский" : "English";
+        const langName = nextLocale === "ru" ? "Русский" : nextLocale === "zh" ? "中文" : "English";
         const nextDict = getDict(nextLocale);
         const osdMsg = nextDict.osd.languageSwitched(langName);
         triggerOsd(osdMsg, 1500);
@@ -926,8 +926,8 @@ function App() {
             const modelIndex = status?.models?.findIndex((m) => m.slot === slot || m.filename === selectedModel);
             const modelNumber = modelIndex !== undefined && modelIndex !== -1 ? modelIndex + 1 : 1;
             const activeModel = status?.models?.find((m) => m.slot === slot || m.filename === selectedModel);
-            const rawName = activeModel?.display_name || (selectedModel ? selectedModel.replace(/\.onnx$/i, "") : (curLocale === "en" ? `Slot #${slot}` : `Слот #${slot}`));
-            const modelName = isHideModelNames ? (curLocale === "en" ? `Model #${modelNumber}` : `Модель #${modelNumber}`) : rawName;
+            const rawName = activeModel?.display_name || (selectedModel ? selectedModel.replace(/\.onnx$/i, "") : (curLocale === "en" ? `Slot #${slot}` : curLocale === "zh" ? `槽位 #${slot}` : `Слот #${slot}`));
+            const modelName = isHideModelNames ? (curLocale === "en" ? `Model #${modelNumber}` : curLocale === "zh" ? `模型 #${modelNumber}` : `Модель #${modelNumber}`) : rawName;
             
             let backendDesc = backend;
             if (backend === "TensorRT") {
@@ -943,6 +943,8 @@ function App() {
               const fpsText = mediaInfo.fps ? ` @ ${mediaInfo.fps.toFixed(2)} fps` : "";
               videoStats = curLocale === "en"
                 ? `\nVideo: ${mediaInfo.width}×${mediaInfo.height}${fpsText} ➔ 4K UHD`
+                : curLocale === "zh"
+                ? `\n视频：${mediaInfo.width}×${mediaInfo.height}${fpsText} ➔ 4K UHD`
                 : `\nВидео: ${mediaInfo.width}×${mediaInfo.height}${fpsText} ➔ 4K UHD`;
             }
 
@@ -996,7 +998,7 @@ function App() {
             await invoke("switch_upscale_network_hotkey", { slot, backend });
 
             const isHideModelNames = localStorage.getItem("l-mpv-hide-model-names") === "true";
-            const modelTitle = isHideModelNames ? (curLocale === "en" ? `Model #${index + 1}` : `Модель #${index + 1}`) : targetModel.display_name;
+            const modelTitle = isHideModelNames ? (curLocale === "en" ? `Model #${index + 1}` : curLocale === "zh" ? `模型 #${index + 1}` : `Модель #${index + 1}`) : targetModel.display_name;
 
             triggerOsd(dict.osd.upscaleModel(modelTitle), 2000);
 
