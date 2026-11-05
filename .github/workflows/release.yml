@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: '发布标签（例如 v2.7.0-build1），留空则自动使用 v+版本号'
+        required: false
+        default: ''
 
 jobs:
   publish-tauri:
@@ -15,6 +20,22 @@ jobs:
     steps:
       - name: 检出源代码
         uses: actions/checkout@v7
+
+      - name: 计算发布标签
+        id: meta
+        shell: pwsh
+        run: |
+          $raw = "${{ inputs.release_tag }}".Trim()
+          $ref = "${{ github.ref_name }}"
+          $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($raw) { $tag = $raw }
+          elseif ($ref -match '^v\d') { $tag = $ref }
+          else { $tag = "v$ver" }
+          $label = ($tag -replace '^v', '') -replace '-build', ' build'
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "tag=$tag"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "label=$label"
+          Write-Host "发布标签: $tag"
+          Write-Host "发布标题版本: $label"
 
       - name: 配置 Node.js
         uses: actions/setup-node@v7
@@ -53,8 +74,8 @@ jobs:
       - name: 从 Git 标签同步版本号到 package.json 和 Cargo.toml
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}"
-          $ver = $tag -replace '^v', ''
+          $tag = "${{ steps.meta.outputs.tag }}"
+          $ver = ($tag -replace '^v', '') -replace '-build\d+$', ''
           if ($ver -match '^\d+\.\d+\.\d+') {
             Write-Host "正在从标签 $tag 设置版本号 $ver ..."
             $pkg = Get-Content package.json -Raw | ConvertFrom-Json
@@ -69,8 +90,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: v__VERSION__
-          releaseName: 'L-MPV v__VERSION__'
+          tagName: ${{ steps.meta.outputs.tag }}
+          releaseName: 'L-MPV ${{ steps.meta.outputs.label }}'
           releaseBody: 'L-MPV 媒体播放器简体中文汉化版（详见下方中文更新日志）。'
           releaseDraft: false
           prerelease: false
@@ -78,11 +99,7 @@ jobs:
       - name: 发布便携版压缩包、独立 l-mpv.exe 和完整性清单
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}"
-          if (-not $tag -or $tag -notmatch '^v\d+') {
-            $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
-            $tag = "v$ver"
-          }
+          $tag = "${{ steps.meta.outputs.tag }}"
           Write-Host "正在准备完整的便携版发行包..."
           New-Item -ItemType Directory -Force -Path "Portable-L-MPV/models/onnx" | Out-Null
           New-Item -ItemType Directory -Force -Path "Portable-L-MPV/inference" | Out-Null
@@ -116,11 +133,7 @@ jobs:
       - name: 应用纯中文发布说明
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}"
-          if (-not $tag -or $tag -notmatch '^v\d+') {
-            $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
-            $tag = "v$ver"
-          }
+          $tag = "${{ steps.meta.outputs.tag }}"
           if (Test-Path ".github/release-notes-zh.md") {
             Write-Host "正在将中文更新日志应用到发布页 $tag ..."
             gh release edit $tag --notes-file .github/release-notes-zh.md
