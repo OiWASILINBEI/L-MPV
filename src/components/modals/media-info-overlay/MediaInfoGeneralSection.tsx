@@ -30,6 +30,9 @@ export const MediaInfoGeneralSection: React.FC<MediaInfoGeneralSectionProps> = (
       filename = decodeURIComponent(rawName);
     } catch (_) {}
   }
+  // Strip URL query tail (?sign=...) but keep the file extension
+  const q = filename.indexOf("?");
+  if (q > 0) filename = filename.slice(0, q);
 
   return (
     <div className="media-info__section">

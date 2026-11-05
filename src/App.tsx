@@ -195,7 +195,10 @@ function App() {
           if (cancelled) return;
           if (t && t !== p) {
             // Strip CDN junk like "_BV1xxx.p2.mp4?..." appended by yt-dlp on segmented streams
-            const clean = t.replace(/[_\s]*[\w.-]*\.(?:mp4|flv|mkv|webm|ts|m4s|m3u8)\?.*$/i, "");
+            let clean = t.replace(/[_\s]*[\w.-]*\.(?:mp4|flv|mkv|webm|ts|m4s|m3u8)\?.*$/i, "");
+            // Also strip plain query tail (?sign=...) while keeping the extension
+            const q = clean.indexOf("?");
+            if (q > 0) clean = clean.slice(0, q);
             setMediaTitleOverride(clean || t);
             return;
           }
