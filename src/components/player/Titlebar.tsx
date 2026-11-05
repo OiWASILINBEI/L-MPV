@@ -19,7 +19,7 @@ import {
   getSavedTimeFormat,
   saveTimeFormat,
   getNextTimeFormat,
-  TIME_FORMAT_OPTIONS,
+  getTimeFormatOptions,
 } from "../../utils/timeFormatUtils";
 
 interface TitlebarProps {
@@ -95,7 +95,7 @@ export const Titlebar = memo(function Titlebar({ title, mediaTitle }: TitlebarPr
     const nextFormat = getNextTimeFormat(timeFormat);
     setTimeFormat(nextFormat);
     saveTimeFormat(nextFormat);
-    const option = TIME_FORMAT_OPTIONS.find((opt) => opt.id === nextFormat);
+    const option = getTimeFormatOptions().find((opt) => opt.id === nextFormat);
     window.dispatchEvent(
       new CustomEvent("show-osd", {
         detail: dict.osd.timeFormat(option?.label || nextFormat),
