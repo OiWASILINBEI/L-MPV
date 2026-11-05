@@ -1,6 +1,7 @@
 import React from "react";
 import { ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
 import { MediaInfoProcessedSection } from "./mediaInfoTypes";
+import { MediaInfoLang } from "../../../utils/mediaInfoParser";
 
 interface MediaInfoSectionItemProps {
   section: MediaInfoProcessedSection;
@@ -8,7 +9,7 @@ interface MediaInfoSectionItemProps {
   onToggleCollapse: (sectionId: string) => void;
   onCopySection: (sectionTitle: string, sectionCleanText: string) => void;
   isCopied: boolean;
-  useRussian: boolean;
+  lang: MediaInfoLang;
 }
 
 export const MediaInfoSectionItem: React.FC<MediaInfoSectionItemProps> = React.memo(({
@@ -17,8 +18,9 @@ export const MediaInfoSectionItem: React.FC<MediaInfoSectionItemProps> = React.m
   onToggleCollapse,
   onCopySection,
   isCopied,
-  useRussian,
+  lang,
 }) => {
+  const L = (ru: string, en: string, zh: string) => (lang === "ru" ? ru : lang === "zh" ? zh : en);
   // Если в секции найдены совпадения поиска, принудительно держим её развернутой
   const effectiveCollapsed = isCollapsed && !section.hasMatches;
 
@@ -35,11 +37,11 @@ export const MediaInfoSectionItem: React.FC<MediaInfoSectionItemProps> = React.m
           </span>
           <span className="mediainfo-section__title">{section.title}</span>
           <span className="mediainfo-section__count-badge">
-            {section.rows.length} {useRussian ? "свойств" : "props"}
+            {section.rows.length} {L("свойств", "props", "项属性")}
           </span>
           {section.matchesCount > 0 && (
             <span className="mediainfo-section__match-badge">
-              {section.matchesCount} {useRussian ? "совп." : "match"}
+              {section.matchesCount} {L("совп.", "match", "个匹配")}
             </span>
           )}
         </button>
@@ -49,7 +51,7 @@ export const MediaInfoSectionItem: React.FC<MediaInfoSectionItemProps> = React.m
           className={`mediainfo-section__copy-btn ${
             isCopied ? "mediainfo-section__copy-btn--copied" : ""
           }`}
-          title={useRussian ? `Скопировать категорию «${section.title}»` : `Copy "${section.title}"`}
+          title={L(`Скопировать категорию «${section.title}»`, `Copy "${section.title}"`, `复制分类「${section.title}」`)}
           onClick={() => onCopySection(section.title, section.cleanText)}
         >
           {isCopied ? (
@@ -92,7 +94,7 @@ interface MediaInfoSectionListProps {
   onToggleSection: (sectionId: string) => void;
   onCopySection: (sectionTitle: string, sectionCleanText: string) => void;
   copiedSectionId: string | null;
-  useRussian: boolean;
+  lang: MediaInfoLang;
 }
 
 export const MediaInfoSectionList: React.FC<MediaInfoSectionListProps> = React.memo(({
@@ -101,7 +103,7 @@ export const MediaInfoSectionList: React.FC<MediaInfoSectionListProps> = React.m
   onToggleSection,
   onCopySection,
   copiedSectionId,
-  useRussian,
+  lang,
 }) => {
   return (
     <div className="mediainfo-standalone__content">
@@ -113,7 +115,7 @@ export const MediaInfoSectionList: React.FC<MediaInfoSectionListProps> = React.m
           onToggleCollapse={onToggleSection}
           onCopySection={onCopySection}
           isCopied={copiedSectionId === section.title}
-          useRussian={useRussian}
+          lang={lang}
         />
       ))}
     </div>
