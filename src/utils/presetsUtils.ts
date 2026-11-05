@@ -500,7 +500,7 @@ export async function applySettingsPreset(preset: SettingsPreset): Promise<void>
   }
 
   // 3.7 Язык интерфейса
-  if (data.language === "ru" || data.language === "en") {
+  if (data.language === "ru" || data.language === "en" || data.language === "zh") {
     saveLocale(data.language);
   }
 
@@ -768,7 +768,7 @@ export function parseImportedPresets(jsonString: string): SettingsPreset[] {
           data: {
              playerTheme: item.data.playerTheme || "graphite",
              settingsStyle: item.data.settingsStyle === "modal" || item.data.settingsStyle === "sidebar" ? item.data.settingsStyle : undefined,
-             language: item.data.language === "ru" || item.data.language === "en" ? item.data.language : undefined,
+             language: item.data.language === "ru" || item.data.language === "en" || item.data.language === "zh" ? item.data.language : undefined,
             accentColor: item.data.accentColor || "#7fc7ff",
             glowIntensity: item.data.glowIntensity || "medium",
             uiOpacity: typeof item.data.uiOpacity === "number" ? item.data.uiOpacity : 0.88,
