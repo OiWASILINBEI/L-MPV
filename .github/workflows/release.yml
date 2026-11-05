@@ -31,7 +31,7 @@ jobs:
           if ($raw) { $tag = $raw }
           elseif ($ref -match '^v\d') { $tag = $ref }
           else { $tag = "v$ver" }
-          $label = ($tag -replace '^v', '') -replace '-build', ' build'
+          $label = $tag -replace '-build', ' build '
           Add-Content -Path $env:GITHUB_OUTPUT -Value "tag=$tag"
           Add-Content -Path $env:GITHUB_OUTPUT -Value "label=$label"
           Write-Host "发布标签: $tag"
