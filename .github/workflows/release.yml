@@ -1,4 +1,4 @@
-name: "Автоматический релиз L-MPV"
+name: "自动发布 L-MPV"
 
 on:
   push:
@@ -13,50 +13,50 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Проверка исходного кода
+      - name: 检出源代码
         uses: actions/checkout@v7
 
-      - name: Настройка Node.js
+      - name: 配置 Node.js
         uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: 'npm'
 
-      - name: Настройка Rust toolchain
+      - name: 配置 Rust 工具链
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Кэширование сборок Rust
+      - name: 缓存 Rust 编译产物
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Установка npm-зависимостей
+      - name: 安装 npm 依赖
         run: npm ci
 
-      - name: Загрузка и распаковка внешних библиотек (libmpv-2.dll, ffmpeg.exe, mediainfo.dll)
+      - name: 下载并解压外部组件 (libmpv-2.dll, ffmpeg.exe, mediainfo.dll)
         shell: pwsh
         run: |
-          Write-Host "Скачивание зависимостей из релиза deps-v1..."
+          Write-Host "正在从 deps-v1 发布页下载依赖组件..."
           Invoke-WebRequest -Uri "https://github.com/Menely/L-MPV/releases/download/deps-v1/mpv_libs.zip" -OutFile "mpv_libs.zip"
-          Write-Host "Распаковка в src-tauri/binaries/..."
+          Write-Host "正在解压到 src-tauri/binaries/ ..."
           Expand-Archive -Path mpv_libs.zip -DestinationPath src-tauri/binaries/ -Force
           Remove-Item mpv_libs.zip -Force
 
-          # Проверка наличия и целостности всех трех нативных компонентов
+          # 检查全部三个原生组件是否存在且完整
           $binFiles = @("src-tauri/binaries/libmpv-2.dll", "src-tauri/binaries/ffmpeg.exe", "src-tauri/binaries/mediainfo.dll")
           foreach ($f in $binFiles) {
-            if (-not (Test-Path $f)) { throw "КРИТИЧЕСКАЯ ОШИБКА: Нативные зависимости отсутствуют в каталоге src-tauri/binaries! Нет файла: $f" }
-            if ((Get-Item $f).Length -eq 0) { throw "КРИТИЧЕСКАЯ ОШИБКА: файл $f пуст!" }
+            if (-not (Test-Path $f)) { throw "严重错误: src-tauri/binaries 目录缺少原生依赖文件: $f" }
+            if ((Get-Item $f).Length -eq 0) { throw "严重错误: 文件 $f 是空文件!" }
           }
-          Write-Host "Все нативные зависимости успешно проверены (libmpv-2.dll с vf_animejanai, ffmpeg.exe, mediainfo.dll)."
+          Write-Host "所有原生依赖检查通过 (libmpv-2.dll 含 vf_animejanai, ffmpeg.exe, mediainfo.dll)。"
 
-      - name: Синхронизация версии из Git-тега в package.json и Cargo.toml
+      - name: 从 Git 标签同步版本号到 package.json 和 Cargo.toml
         shell: pwsh
         run: |
           $tag = "${{ github.ref_name }}"
           $ver = $tag -replace '^v', ''
           if ($ver -match '^\d+\.\d+\.\d+') {
-            Write-Host "Установка версии $ver из тега $tag..."
+            Write-Host "正在从标签 $tag 设置版本号 $ver ..."
             $pkg = Get-Content package.json -Raw | ConvertFrom-Json
             $pkg.version = $ver
             $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json
@@ -64,18 +64,18 @@ jobs:
             (Get-Content src-tauri/Cargo.toml) -replace '^version = ".*?"', "version = `"$ver`"" | Set-Content src-tauri/Cargo.toml
           }
 
-      - name: Сборка и публикация релиза Tauri
+      - name: 编译并发布 Tauri 版本
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: v__VERSION__
           releaseName: 'L-MPV v__VERSION__'
-          releaseBody: 'Автоматический релиз медиаплеера L-MPV с поддержкой Real-Time 4K AI Upscaling (DirectML / TensorRT).'
+          releaseBody: 'L-MPV 媒体播放器自动构建版本，支持实时 4K AI 超分辨率 (DirectML / TensorRT)。本仓库为简体中文汉化版。'
           releaseDraft: false
           prerelease: false
 
-      - name: Публикация портативного архива, автономного l-mpv.exe и манифеста целостности
+      - name: 发布便携版压缩包、独立 l-mpv.exe 和完整性清单
         shell: pwsh
         run: |
           $tag = "${{ github.ref_name }}"
@@ -83,7 +83,7 @@ jobs:
             $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
             $tag = "v$ver"
           }
-          Write-Host "Подготовка полноценного портативного дистрибутива..."
+          Write-Host "正在准备完整的便携版发行包..."
           New-Item -ItemType Directory -Force -Path "Portable-L-MPV/models/onnx" | Out-Null
           New-Item -ItemType Directory -Force -Path "Portable-L-MPV/inference" | Out-Null
           New-Item -ItemType Directory -Force -Path "Portable-L-MPV/config/presets" | Out-Null
@@ -96,17 +96,17 @@ jobs:
           Copy-Item "src-tauri/binaries/ffmpeg.exe" -Destination "Portable-L-MPV/ffmpeg.exe" -Force
           Copy-Item "src-tauri/binaries/mediainfo.dll" -Destination "Portable-L-MPV/mediainfo.dll" -Force
           
-          Write-Host "Генерация манифеста целостности checksums.json..."
+          Write-Host "正在生成完整性清单 checksums.json..."
           Push-Location src-tauri
           cargo run --release -q --example gen_checksums -- -o ../checksums.json ../Portable-L-MPV
           Pop-Location
           Copy-Item "checksums.json" -Destination "Portable-L-MPV/checksums.json" -Force
 
           $portableZip = "L-MPV-$tag-portable.zip"
-          Write-Host "Создание архива $portableZip..."
+          Write-Host "正在创建压缩包 $portableZip ..."
           Compress-Archive -Path "Portable-L-MPV/*" -DestinationPath $portableZip -Force
           
-          Write-Host "Загрузка артефактов в релиз $tag..."
+          Write-Host "正在上传产物到发布页 $tag ..."
           gh release upload $tag $portableZip --clobber
           gh release upload $tag "src-tauri/target/release/l-mpv.exe#l-mpv.exe" --clobber
           gh release upload $tag "checksums.json#checksums.json" --clobber
