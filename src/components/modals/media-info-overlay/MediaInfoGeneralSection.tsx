@@ -2,6 +2,7 @@ import React from "react";
 import type { MediaInfo } from "../../../contexts/PlayerStateContext";
 import { formatTime } from "../../../utils/timeUtils";
 import { formatBytes } from "./mediaInfoOverlayUtils";
+import { cleanMediaName } from "../../../utils/mediaNameUtils";
 import { useTranslation } from "../../../i18n/LanguageContext";
 
 /**
@@ -23,16 +24,7 @@ export const MediaInfoGeneralSection: React.FC<MediaInfoGeneralSectionProps> = (
   currentPosition,
 }) => {
   const { dict } = useTranslation();
-  const rawName = mediaInfo?.path ? (mediaInfo.path.split(/[/\\]/).pop() || "—") : "—";
-  let filename: string = rawName;
-  if (rawName && rawName.includes("%")) {
-    try {
-      filename = decodeURIComponent(rawName);
-    } catch (_) {}
-  }
-  // Strip URL query tail (?sign=...) but keep the file extension
-  const q = filename.indexOf("?");
-  if (q > 0) filename = filename.slice(0, q);
+  const filename = mediaInfo?.path ? cleanMediaName(mediaInfo.path) || "—" : "—";
 
   return (
     <div className="media-info__section">

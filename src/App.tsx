@@ -22,6 +22,7 @@ import { ContextMenu } from "./components/player/ContextMenu";
 import { PlaylistDrawer } from "./components/player/PlaylistDrawer";
 import { SeekIndicator } from "./components/player/SeekIndicator";
 import { formatSpeedValue } from "./components/player/controls";
+import { cleanMediaName } from "./utils/mediaNameUtils";
 import { UpdateInfo } from "./components/modals/UpdateModal";
 import { getVisualizerConfig, saveVisualizerConfig, VisualizerMode } from "./components/player/AudioVisualizer";
 import { applyAccentColor } from "./utils/colorUtils";
@@ -62,28 +63,6 @@ const UpdateToast = lazy(() =>
 const SubtitlesSearchModal = lazy(() =>
   import("./components/subtitles/SubtitlesSearchModal").then((m) => ({ default: m.SubtitlesSearchModal }))
 );
-
-/**
- * Clean a URL-derived display name:
- * 1. decode percent-encoding (%E4%B9%9D -> 中文)
- * 2. cut the "?sign=..." query tail FIRST so the file extension is kept
- * 3. drop yt-dlp CDN segment junk like "_BV1xxx.p2.mp4" only when a
- *    non-empty prefix remains (never eats the whole name)
- */
-function cleanUrlDisplayName(raw: string): string {
-  if (!raw) return raw;
-  let name = raw;
-  if (name.includes("%")) {
-    try {
-      name = decodeURIComponent(name);
-    } catch (_) {}
-  }
-  const q = name.indexOf("?");
-  if (q > 0) name = name.slice(0, q);
-  const m = name.match(/^(.*?)[_\s]+[A-Za-z0-9][A-Za-z0-9.-]*\.(?:mp4|flv|mkv|webm|ts|m4s|m3u8)$/i);
-  if (m && m[1]) name = m[1];
-  return name || raw;
-}
 
 function App() {
   const { dict } = useTranslation();
@@ -199,10 +178,16 @@ function App() {
     };
   }, [showSettings, settingsStyle]);
 
+  /**
+   * 只有网址播放才需要用 mpv 的 media-title（yt-dlp 解析出的真实视频名）。
+   * 本地文件一律用文件名本身：mpv 的 media-title 对本地文件会取容器内嵌标题，
+   * 常常是被截短的名字、或者没有后缀，导致和媒体信息面板对不上。
+   */
+  const isUrlPlayback = /^https?:\/\//i.test(mediaInfo?.path || "");
   const [mediaTitleOverride, setMediaTitleOverride] = useState("");
   useEffect(() => {
     const p = mediaInfo?.path || "";
-    if (!/^https?:\/\//i.test(p)) {
+    if (!isUrlPlayback) {
       setMediaTitleOverride("");
       return;
     }
@@ -216,10 +201,7 @@ function App() {
           const t = await invoke<string>("mpv_get_property_string", { name: "media-title" });
           if (cancelled) return;
           if (t && t !== p) {
-            // For direct links media-title can be the URL itself; keep only
-            // the last path segment before cleaning.
-            const lastSeg = /^https?:\/\//i.test(t) ? t.split(/[/\\]/).pop() || t : t;
-            setMediaTitleOverride(cleanUrlDisplayName(lastSeg));
+            setMediaTitleOverride(cleanMediaName(t));
             return;
           }
         } catch (_) {}
@@ -228,16 +210,13 @@ function App() {
     };
     poll();
     return () => { cancelled = true; };
-  }, [mediaInfo?.path]);
+  }, [mediaInfo?.path, isUrlPlayback]);
 
-  // Fallback (override not resolved yet, or media-title == path for direct
-  // links): URL paths get the same cleaning so "?sign=..." never leaks.
-  const rawFallbackName = mediaInfo?.path ? mediaInfo.path.split(/[/\\]/).pop() || "" : "";
-  const mediaTitle =
-    mediaTitleOverride ||
-    (/^https?:\/\//i.test(mediaInfo?.path || "")
-      ? cleanUrlDisplayName(rawFallbackName)
-      : rawFallbackName);
+  // Titlebar and media-info panel share cleanMediaName so both always match.
+  const fileNameFromPath = mediaInfo?.path ? cleanMediaName(mediaInfo.path) : "";
+  const mediaTitle = isUrlPlayback
+    ? mediaTitleOverride || fileNameFromPath
+    : fileNameFromPath;
 
   const clickTimerRef = useRef<number | null>(null);
   const hasMediaRef = useRef(hasMedia);
