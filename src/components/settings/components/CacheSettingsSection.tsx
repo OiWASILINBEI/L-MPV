@@ -6,6 +6,14 @@ import { useTranslation } from "../../../i18n/LanguageContext";
 import { AccordionSection } from "./AccordionSection";
 
 const labels = {
+  zh: {
+    title: "缓存", total: "总计", refresh: "刷新", clear: "清理", clearAll: "全部清理",
+    category: "缓存", size: "大小", files: "文件数", copyPath: "复制路径", pathCopied: "路径已复制。",
+    remaining: "被占用的文件将在下次启动时重试清理。",
+    done: "缓存已清理，会在使用播放器时重新生成。",
+    thumbnails: "视频预览", waveforms: "时间轴热力图", subtitles: "字幕",
+    shaders: "着色器", icc: "色彩配置文件", browser: "WebView 缓存", other: "组件校验及其他缓存"
+  },
   ru: {
     title: "Кеш", total: "Всего", refresh: "Обновить", clear: "Очистить", clearAll: "Очистить всё",
     category: "Кэш", size: "Размер", files: "Файлов", copyPath: "Копировать путь", pathCopied: "Путь скопирован.",
