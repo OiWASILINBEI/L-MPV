@@ -31,7 +31,6 @@ import {
 import {
   MIN_MODAL_WIDTH,
   TECH_MODAL_MIN_WIDTH,
-  VIRTUAL_WINDOW_SIZE,
   ESTIMATED_ROW_HEIGHT_NORMAL,
   ESTIMATED_ROW_HEIGHT_TECH,
   SUBTITLE_VIEW_MODE_KEY,
@@ -45,9 +44,7 @@ import {
   type SubtitlesSearchModalProps,
 } from "./subtitleTypes";
 import {
-  computeSubtitlesCorpusStats,
   normalizeSubtitleLocale,
-  clearTokenizerCache,
 } from "./subtitleTokenizer";
 
 /**
@@ -243,11 +240,22 @@ export function SubtitlesSearchModal({ onClose }: SubtitlesSearchModalProps) {
     );
   }, [currentDisplayedTrack?.lang, activeTrack?.lang, appLocale]);
 
-  // ── Статистика корпуса слов (Intl.Segmenter) ───────────────────────────────
+  // ── Статистика корпуса слов (быстрый подсчёт без блокировки UI) ─────────────
   const corpusStats = useMemo(() => {
-    clearTokenizerCache();
-    return computeSubtitlesCorpusStats(lines, activeSubLocale);
-  }, [lines, activeSubLocale]);
+    if (!lines || lines.length === 0) {
+      return { totalWords: 0, totalLines: 0, uniqueWords: 0, averageWpm: 0 };
+    }
+    // Быстрый неблокирующий подсчет слов для заголовка окна
+    let count = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const txt = lines[i].text;
+      if (txt) {
+        const words = txt.match(/[\p{L}\p{N}]+/gu);
+        if (words) count += words.length;
+      }
+    }
+    return { totalWords: count, totalLines: lines.length, uniqueWords: 0, averageWpm: 0 };
+  }, [lines]);
 
   // ── Активная реплика ───────────────────────────────────────────────────────
   const activeLineIndex = useActiveLineIndex({
@@ -296,24 +304,23 @@ export function SubtitlesSearchModal({ onClose }: SubtitlesSearchModalProps) {
   });
 
   // ── Виртуализация списка (Phantom Spacer) ──────────────────────────────────
-  // Для списков до 2500 строк виртуализация не требуется: WebView2 мгновенно
-  // рендерит легковесные мемоизированные элементы, гарантируя абсолютную плавность скролла.
+  // Виртуализируем всегда, когда строк больше 50 (на экран помещается ~12-16 строк).
+  // Это кардинально ускоряет монтирование модального окна и исключает лаги инспектора DevTools.
   const { visibleLines, paddingTop, paddingBottom } = useMemo(() => {
     const total = filteredLines.length;
-    if (total <= 2500) {
+    if (total <= 50) {
       return { visibleLines: filteredLines, paddingTop: 0, paddingBottom: 0 };
     }
 
-    const overscan = 50;
-    // Для сверхдлинных списков (> 2500 строк) окно отслеживает реальный скролл
-    // без скачков paddingTop при смене отдельной реплики
+    const overscan = 20;
+    const windowSize = 60;
     const center = Math.floor(scrollOffset / estimatedRowHeight);
 
     const start = Math.max(
       0,
-      Math.min(center - overscan, total - VIRTUAL_WINDOW_SIZE)
+      Math.min(center - overscan, Math.max(0, total - windowSize))
     );
-    const end = Math.min(total, start + VIRTUAL_WINDOW_SIZE);
+    const end = Math.min(total, start + windowSize);
 
     return {
       visibleLines: filteredLines.slice(start, end),
@@ -383,11 +390,23 @@ export function SubtitlesSearchModal({ onClose }: SubtitlesSearchModalProps) {
     const container = listContainerRef.current;
     if (!container) return;
     const currentTop = container.scrollTop;
-    if (Math.abs(currentTop - scrollOffsetRef.current)> 15) {
-      scrollOffsetRef.current = currentTop;
-      setScrollOffset(currentTop);
-    }
-    if (Math.abs(container.scrollTop - expectedScrollTopRef.current) <= 2) {
+    // Программная прокрутка уже обновляет ref до события scroll.
+    // Окно виртуализации сравниваем с React-состоянием, иначе оно застывает.
+    scrollOffsetRef.current = currentTop;
+    setScrollOffset((previous) =>
+      Math.abs(currentTop - previous) > 15 ? currentTop : previous
+    );
+    // Фильтрация и смена режима могут уменьшить scrollHeight: браузер
+    // ограничит прежнюю программную позицию новыми границами списка.
+    const expectedTop = Math.max(
+      0,
+      Math.min(
+        expectedScrollTopRef.current,
+        Math.max(0, container.scrollHeight - container.clientHeight)
+      )
+    );
+    if (Math.abs(currentTop - expectedTop) <= 2) {
+      expectedScrollTopRef.current = expectedTop;
       return;
     }
     lastManualNavTimeRef.current = Date.now();
@@ -534,10 +553,7 @@ export function SubtitlesSearchModal({ onClose }: SubtitlesSearchModalProps) {
                 }`}
                 title={dict.subtitlesSearch.followTooltip}
               >
-                <Radio
-                  size={14}
-                  className={followPlayback ? "pulse-subtle" : ""}
-                />
+                <Radio size={14} />
                 <span>{dict.subtitlesSearch.tracking}</span>
               </button>
             </div>
@@ -578,13 +594,13 @@ export function SubtitlesSearchModal({ onClose }: SubtitlesSearchModalProps) {
                   gap: "var(--space-3)",
                   padding: "7px 12px",
                   background: followPlayback
-                    ? "rgba(var(--accent-rgb, 127, 199, 255), 0.20)"
-                    : "rgba(255, 255, 255, 0.05)",
+                    ? "var(--surface-accent-subtle)"
+                    : "var(--surface-level-3)",
                   border: "1px solid",
                   borderColor: followPlayback
                     ? "var(--accent)"
                     : "var(--border-pill)",
-                  borderRadius: "var(--radius-xs)",
+                  borderRadius: "var(--radius-control)",
                   color: followPlayback
                     ? "var(--accent-text)"
                     : "var(--text-secondary)",
@@ -599,10 +615,7 @@ export function SubtitlesSearchModal({ onClose }: SubtitlesSearchModalProps) {
                 }`}
                 title={dict.subtitlesSearch.followTooltip}
               >
-                <Radio
-                  size={13}
-                  className={followPlayback ? "pulse-subtle" : ""}
-                />
+                <Radio size={13} />
                 <span>{dict.subtitlesSearch.tracking}</span>
               </button>
             </div>
@@ -613,7 +626,7 @@ export function SubtitlesSearchModal({ onClose }: SubtitlesSearchModalProps) {
             style={{
               padding: "8px 12px",
               background: isCapsule ? undefined : "rgba(255, 255, 255, 0.03)",
-              borderRadius: isCapsule ? undefined : "var(--radius-xs)",
+              borderRadius: isCapsule ? undefined : "var(--radius-control)",
               color: "var(--text-muted)",
               fontSize: "var(--fs-sm)",
               marginBottom: isCapsule ? 0 : "var(--space-5)",
@@ -671,6 +684,8 @@ export function SubtitlesSearchModal({ onClose }: SubtitlesSearchModalProps) {
             flex: 1,
             minHeight: 0,
             overflowY: "auto",
+            // Смещение при замене виртуального окна контролирует сам список.
+            overflowAnchor: "none",
             scrollbarGutter: "stable",
             display: "flex",
             flexDirection: "column",

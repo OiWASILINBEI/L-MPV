@@ -42,19 +42,22 @@ pub fn open_file(
 
 /// Внутренняя функция открытия файла с опциональной отправкой события обновления плейлиста.
 ///
-/// Горячий путь устроен так, чтобы первый кадр пошёл максимально быстро:
-/// синхронно выполняются только дешёвые операции (сейв позиции в память,
-/// resume-старт, `loadfile`), а сканирование диска и достройка плейлиста
-/// уходят в фоновый поток. Команда возвращается сразу после постановки
-/// `loadfile` в очередь mpv.
+/// Сохранение истории и resume выполняются до `loadfile`, чтение настроек —
+/// после его постановки в очередь mpv. Сканирование внешних дорожек и
+/// достройка плейлиста вынесены в поток с допуском по состоянию воспроизведения.
 pub fn open_file_internal(
     state: &PlayerState,
     path: &str,
     app: Option<&tauri::AppHandle>,
 ) -> Result<(), String> {
+    super::startup::cancel_startup_for_other_file(state, path)?;
     // Сохранение позиции предыдущего файла перед открытием нового
-    save_current_playback_position(state);
-    save_history_to_disk();
+    if !state.mpv.get_property_string("path").unwrap_or_default().is_empty() {
+        save_current_playback_position(state);
+        save_history_to_disk();
+    }
+
+    let transition = super::dir_scan::lock_open_transition()?;
 
     let target_path = std::path::PathBuf::from(path);
     let safe_target = escape_mpv_path(path);
@@ -74,7 +77,10 @@ pub fn open_file_internal(
     let _ = state.mpv.set_property_string("sub-auto", "no");
     let _ = state.mpv.set_property_string("audio-file-auto", "no");
 
-    // 1. Мгновенно запускаем воспроизведение выбранного файла.
+    let generation = next_open_generation();
+    let open_work = super::background_io::OpenWork::begin(generation, true);
+
+    // 1. Ставим открытие выбранного файла в очередь mpv.
     state.mpv.command(&format!(
         "loadfile \"{}\" replace",
         safe_target
@@ -83,28 +89,33 @@ pub fn open_file_internal(
     let _ = state.mpv.set_property_double("video-pan-x", 0.0);
     let _ = state.mpv.set_property_double("video-pan-y", 0.0);
     state.ambient_controller.invalidate();
+    drop(transition);
 
-    // Флаги читаются один раз (один парсинг settings.json на открытие).
+    // Read settings after queuing playback, so a slow portable disk does not
+    // delay loadfile. The short-lived guard already excludes competing analysis.
     let settings = AppSettings::load_portable();
     let auto_load_tracks = settings.auto_load_tracks;
-    let auto_select_external_audio =
-        settings.auto_select_external_audio;
+    let auto_select_external_audio = settings.auto_select_external_audio;
+    if !auto_load_tracks || !auto_select_external_audio { open_work.audio_selected(); }
 
     // 2. Всё тяжёлое — в фон: внешние дорожки и плейлист.
     // Новое поколение отменяет устаревшую задачу прошлого открытия.
-    let generation = next_open_generation();
     let bg_mpv = state.mpv.clone();
     let bg_app = app.cloned();
     let bg_prev_path = prev_path.clone();
     let _ = std::thread::Builder::new()
         .name("lmpv-open-bg".to_string())
         .spawn(move || {
+            let open_work = open_work;
             if current_open_generation() != generation {
                 return;
             }
             // Подгружаем внешние дорожки и субтитры (если опция активна).
             // Скан каталога берётся из mtime-кэша.
             if auto_load_tracks {
+                if !super::background_io::wait_for_open(
+                    &bg_mpv, &target_path.to_string_lossy(), &bg_prev_path, generation, false,
+                ) { return; }
                 let _ = load_external_tracks_internal(
                     &bg_mpv,
                     &target_path,
@@ -113,15 +124,21 @@ pub fn open_file_internal(
                     &bg_prev_path,
                 );
             }
+            open_work.audio_selected();
             if current_open_generation() != generation {
                 return;
             }
             // Фоново формируем плейлист из остальных файлов в той же папке.
             // Каталог читается один раз общим листингом (см. dir_scan).
+            if !super::background_io::wait_for_open(
+                &bg_mpv, &target_path.to_string_lossy(), "", generation, true,
+            ) { return; }
             let _ = populate_folder_playlist(
                 &bg_mpv,
                 &target_path,
                 bg_app.as_ref(),
+                generation,
+                true,
             );
         });
 
@@ -143,6 +160,7 @@ pub fn open_file_internal(
 pub fn toggle_pause(
     state: State<'_, PlayerState>,
 ) -> Result<(), String> {
+    super::startup::cancel_startup_playback(&state, false)?;
     // Если достигнут конец воспроизведения, перезапускаем видео с самого начала
     let dur = state
         .mpv
@@ -178,6 +196,7 @@ pub fn set_pause(
     state: State<'_, PlayerState>,
     paused: bool,
 ) -> Result<(), String> {
+    super::startup::cancel_startup_playback(&state, false)?;
     let mut restart = false;
     if !paused {
         let dur = state
@@ -278,6 +297,7 @@ pub fn seek_preview(
 pub fn frame_step(
     state: State<'_, PlayerState>,
 ) -> Result<(), String> {
+    super::startup::cancel_startup_playback(&state, false)?;
     let result = state.mpv.command("frame-step");
     invalidate_ambient_result(&state, result)
 }
@@ -307,6 +327,7 @@ pub fn mpv_get_property_string(
 pub fn frame_back_step(
     state: State<'_, PlayerState>,
 ) -> Result<(), String> {
+    super::startup::cancel_startup_playback(&state, false)?;
     let result = state.mpv.command("frame-back-step");
     invalidate_ambient_result(&state, result)
 }

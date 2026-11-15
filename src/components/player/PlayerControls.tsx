@@ -139,6 +139,12 @@ export function PlayerControls({
       closePopoverTimerRef.current = null;
     }
     const currentType = activePopover;
+    // Opening an external overlay can request a close with no popover open.
+    // Do not focus unrelated controls in that case.
+    if (!currentType) {
+      setClosingPopover(null);
+      return;
+    }
     const restoreFocus = () => {
       const id = currentType === "audio" ? "btn-audio-tracks"
         : currentType === "sub" ? "btn-sub-tracks"
@@ -412,14 +418,25 @@ export function PlayerControls({
       const isInsideSpeedPopover = speedPopoverRef.current?.contains(target);
       const isInsideMorePopover = morePopoverRef.current?.contains(target);
       if (!isInsideTrackPopover && !isInsideSpeedPopover && !isInsideMorePopover) {
+        const isTrackVideoClick = e.button === 0 &&
+          (activePopover === "audio" || activePopover === "sub") && !!target.closest(".video-area");
+        // Keep the track menu open until click capture can consume this same gesture.
+        if (e.type === "mousedown" && isTrackVideoClick) return;
+        if (e.type === "click" && !isTrackVideoClick) return;
+        if (isTrackVideoClick) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         closePopover();
       }
     };
     if (activePopover) {
       document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("click", handleClickOutside, true);
     }
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("click", handleClickOutside, true);
     };
   }, [activePopover, closePopover]);
 
@@ -948,9 +965,9 @@ export function PlayerControls({
         aria-label={isFullscreen ? dict.controls.exitFullscreen : dict.controls.fullscreen}
       >
         {isFullscreen ? (
-          <MinimizeIcon size={18} />
+          <MinimizeIcon size={24} />
         ) : (
-          <Maximize size={18} />
+          <Maximize size={24} />
         )}
       </button>
     ) : null

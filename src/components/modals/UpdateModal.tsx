@@ -160,12 +160,13 @@ const VersionPicker: React.FC<VersionPickerProps> = React.memo(({
     </button>
 
     {isPickerOpen && (
-      <div className="version-picker-popover custom-scrollbar" role="menu">
+      <div className="version-picker-popover" role="menu">
         <div className="version-picker-header">
           {isLoadingReleases
             ? dict.updateModal.loadingReleases
             : dict.updateModal.availableReleases(releases.length)}
         </div>
+        <div className="version-picker-list custom-scrollbar">
         {releases.length === 0 && !isLoadingReleases ? (
           <div style={{ padding: "8px 10px", fontSize: "var(--fs-xs)", color: "var(--text-muted)", fontStyle: "italic" }}>
             {dict.updateModal.releasesUnavailable}
@@ -201,6 +202,7 @@ const VersionPicker: React.FC<VersionPickerProps> = React.memo(({
             );
           })
         )}
+        </div>
       </div>
     )}
   </div>
@@ -373,7 +375,7 @@ const DownloadProgressBar: React.FC<DownloadProgressProps> = React.memo(({
         style={{
           width: `${progress}%`,
           height: "100%",
-          background: "linear-gradient(90deg, var(--accent, #3b82f6) 0%, #60a5fa 100%)",
+          background: "var(--accent-gradient, linear-gradient(90deg, var(--accent) 0%, var(--accent-hover) 100%))",
           borderRadius: "var(--radius-xs)",
           transition: "width 0.2s ease-out, border-radius var(--t-spring) var(--ease-spring-smooth)",
           boxShadow: "none",
@@ -545,16 +547,16 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
       {!isCapsule ? (
         /* ─── КЛАССИЧЕСКИЙ РЕЖИМ (Модерн, Прикрепленный) ─── */
         <div
-          className={`modal-container update-modal-card ${isClosing ? "update-modal-card--closing" : ""}`}
+          className={`modal-container update-modal-card update-modal--${controlBarStyle} ${isClosing ? "update-modal-card--closing" : ""}`}
           role="dialog"
           aria-modal="true"
           aria-labelledby="update-modal-title"
           onClick={(e) => e.stopPropagation()}
           style={{
             width: isExpanded ? "820px" : "480px",
-            maxWidth: "94vw",
+            maxWidth: "min(94vw, calc(100vw / var(--ui-scale, 1) - 24px))",
             height: isExpanded ? "78vh" : "420px",
-            maxHeight: "92vh",
+            maxHeight: "min(92vh, calc(100dvh / var(--ui-scale, 1) - 24px))",
             display: "flex",
             flexDirection: "column",
             borderRadius: "var(--radius-surface)",
@@ -569,26 +571,31 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
             transition: "width 0.3s cubic-bezier(0.16, 1, 0.3, 1), height 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-radius var(--t-spring) var(--ease-spring-smooth)",
           }}
         >
-          {/* Шапка модального окна */}
+          {/* Шапка модального окна.
+              По высоте и плотности повторяет футер: одинаковые отступы,
+              выравнивание по центру и полупрозрачная подложка. Освободившееся
+              место уходит центральной части (тело — flex: 1). */}
           <div
             onDoubleClick={() => setIsExpanded((prev) => !prev)}
             style={{
-              padding: "20px 24px 16px",
+              padding: "10px 22px",
               display: "flex",
-              alignItems: "flex-start",
+              alignItems: "center",
               justifyContent: "space-between",
+              gap: 14,
               borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+              background: "rgba(0, 0, 0, 0.2)",
               cursor: "default",
               userSelect: "none",
               flexShrink: 0,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
               <div
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: "var(--radius-md)",
+                  width: 32,
+                  height: 32,
+                  borderRadius: "var(--radius-control)",
                   background: "rgba(var(--accent-rgb, 59, 130, 246), 0.12)",
                   border: "1px solid var(--border-pill, rgba(var(--accent-rgb, 59, 130, 246), 0.22))",
                   display: "flex",
@@ -599,13 +606,13 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
                   transition: "border-radius var(--t-spring) var(--ease-spring-smooth)",
                 }}
               >
-                <AppLogoIcon size={24} color="var(--accent-text, var(--accent))" />
+                <AppLogoIcon size={18} color="var(--accent-text, var(--accent))" />
               </div>
-              <div>
-                <h3 id="update-modal-title" style={{ margin: "var(--space-0)", fontSize: "var(--fs-xl)", fontWeight: 700, letterSpacing: "-0.01em" }}>
+              <div style={{ minWidth: 0 }}>
+                <h3 id="update-modal-title" style={{ margin: "var(--space-0)", fontSize: "var(--fs-lg)", fontWeight: 700, letterSpacing: "-0.01em" }}>
                   {titleText}
                 </h3>
-                <p style={{ margin: "3px 0 0", fontSize: "var(--fs-sm)", color: "var(--text-muted, #9ca3af)" }}>
+                <p style={{ margin: "1px 0 0", fontSize: "var(--fs-xs)", color: "var(--text-muted, #9ca3af)" }}>
                   {subtitleText}
                 </p>
               </div>
@@ -751,6 +758,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
 
           {/* Футер с версией приложения и кнопками */}
           <div
+            className="update-modal-footer"
             style={{
               padding: "10px 22px",
               borderTop: "1px solid rgba(255, 255, 255, 0.08)",
@@ -778,7 +786,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
               dict={dict}
             />
 
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", flexShrink: 0 }}>
+            <div className="update-modal-actions">
               <UpdateActionButtons
                 isUpgrade={isUpgrade}
                 isDowngrade={isDowngrade}
@@ -803,16 +811,20 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
           aria-labelledby="update-modal-title"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* 1. Верхний ряд: 2 самостоятельные карточки (инфо слева, действия справа) */}
+          {/* 1. Верхний ряд: 3 самостоятельные карточки (иконка, инфо, действия).
+              Иконка-логотип — отдельный островок, как иконка настроек в окне
+              настроек: свой фон, свой контур, без «плашки» внутри инфо-карточки. */}
           <div className="update-capsule-header">
+            {/* Островок логотипа */}
+            <div className="update-card update-card--logo">
+              <AppLogoIcon size={28} color="var(--accent-text, var(--accent))" />
+            </div>
+
             {/* Островок информации */}
             <div
               className="update-card update-card--header-info"
               onDoubleClick={() => setIsExpanded((prev) => !prev)}
             >
-              <div className="update-card__logo-badge">
-                <AppLogoIcon size={20} color="var(--accent-text, var(--accent))" />
-              </div>
               <div className="update-card__title-group">
                 <h3 id="update-modal-title" className="update-card__title">
                   {titleText}
@@ -877,7 +889,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
                   padding: "10px 14px",
                   background: "rgba(239, 68, 68, 0.15)",
                   border: "1px solid rgba(239, 68, 68, 0.3)",
-                  borderRadius: "max(0px, calc(var(--radius-controls, 16px) - 6px))",
+                  borderRadius: "var(--radius-md)",
                   color: "#fca5a5",
                   fontSize: "var(--fs-xs)",
                   marginTop: "10px",
@@ -904,7 +916,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
           </div>
 
           {/* 3. Нижний ряд: футер-островок с версиями и кнопками действий */}
-          <div className="update-card update-card--footer">
+          <div className="update-card update-card--footer update-modal-footer">
             <VersionPicker
               currentVersion={currentVersion}
               targetVersion={targetVersion}
@@ -920,7 +932,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
               dict={dict}
             />
 
-            <div className="update-card__actions">
+            <div className="update-card__actions update-modal-actions">
               <UpdateActionButtons
                 isUpgrade={isUpgrade}
                 isDowngrade={isDowngrade}

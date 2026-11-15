@@ -140,6 +140,7 @@ export interface TranslationDict {
       presets: string;
       upscaling: string;
       hotkeys: string;
+      system: string;
       integration: string;
     };
     general: {
@@ -182,6 +183,8 @@ export interface TranslationDict {
       saveTracksToDirTitle: string;
       saveTracksToDirDesc: string;
       waveformActivityTitle: string;
+      timelinePreviewTitle: string;
+      timelinePreviewDesc: string;
       waveformActivityDesc: string;
 
       // Язык
@@ -195,6 +198,8 @@ export interface TranslationDict {
       contextMenuSection: string;
       // Качество видео и аудио
       videoAudioSection: string;
+      volumeIndicatorTitle: string;
+      volumeIndicatorDesc: string;
       // Блок 1: Лимитер
       audioLimiterTitle: string;
       audioLimiterDesc: string;
@@ -469,8 +474,12 @@ export interface TranslationDict {
           splineDesc: string;
           blocks: string;
           blocksDesc: string;
-          mirrored?: string;
-          mirroredDesc?: string;
+          area: string;
+          areaDesc: string;
+          steps: string;
+          stepsDesc: string;
+          dots: string;
+          dotsDesc: string;
         };
         sourceTitle: string;
         sources: {
@@ -503,7 +512,6 @@ export interface TranslationDict {
         heightDesc: string;
         opacityLabel: string;
         opacityDesc: string;
-        showCrestLabel: string;
         loadingText: string;
         errorText: string;
         noVideoStream: string;
@@ -648,6 +656,14 @@ export interface TranslationDict {
       backendDesc: string;
       backendOpenFolderTitle: string;
       statusInstalled: string;
+      runtimeUpdateRequired: string;
+      playerUpdateRequired: string;
+      runtimeRestartRequired: string;
+      downloadMismatch: string;
+      upscaleBusy: string;
+      btnUpdateEngine: string;
+      trtRebuildBadge: string;
+      trtRebuildRequired: string;
       statusNotInstalled: string;
       badgeInstalledTitle: string;
       btnDownloadLibsTitle: string;
@@ -674,6 +690,8 @@ export interface TranslationDict {
       trtCompileTitle: string;
       trtCompileBadge: string;
       compilingProgress: string;
+      favoriteSetTitle: string;
+      favoriteUnsetTitle: string;
     };
     hotkeys: {
       hotkeysSection: string;
@@ -703,25 +721,84 @@ export interface TranslationDict {
     };
     integrationFields: {
       fileAssocTitle: string;
+      fileAssocSubtitle: string;
       fileAssocDesc: string;
       errReg: (err: string) => string;
       statusLinking: string;
+      statusLinkingShort: string;
       btnLink: string;
+      btnLinkFiles: string;
       errOpenSettings: (err: string) => string;
       btnWindowsSettings: string;
+      btnWindowsParams: string;
+      btnWindowsParamsTooltip: string;
       errUnreg: (err: string) => string;
       statusUnlinking: string;
+      statusUnlinkingShort: string;
       btnUnlink: string;
+      btnUnlinkFiles: string;
+      btnUnlinkFilesTooltip: string;
       cmenuTitle: string;
       cmenuActive: string;
       cmenuInactive: string;
+      cmenuSubtitle: string;
       cmenuDesc: string;
       errCmenuReg: (err: string) => string;
       statusApplying: string;
+      statusApplyingShort: string;
       btnAddCmenu: string;
+      btnAddCmenuShort: string;
       errCmenuUnreg: (err: string) => string;
       btnRemoveCmenu: string;
+      btnRemoveCmenuShort: string;
       logPlaceholder: string;
+      operationLogTitle: string;
+    };
+    systemFields: {
+      title: string;
+      desc: string;
+      btnRefresh: string;
+      btnRefreshTooltip: string;
+      loadingDiagnostics: string;
+      coreTitle: string;
+      coreDesc: string;
+      appVersion: string;
+      appArch: string;
+      appMode: string;
+      modePortable: string;
+      libmpvTitle: string;
+      libmpvDesc: string;
+      libmpvActive: string;
+      libmpvMissing: string;
+      animejanaiCompiled: string;
+      animejanaiNotDetected: string;
+      ffmpegTitle: string;
+      ffmpegDesc: string;
+      mediainfoTitle: string;
+      mediainfoDesc: string;
+      aiInferenceTitle: string;
+      aiInferenceDesc: string;
+      aiInstalledBadge: (count: number) => string;
+      ajiBridge: string;
+      tensorrtRuntime: string;
+      directmlRuntime: string;
+      hardwareTitle: string;
+      hardwareDesc: string;
+      gpuModel: string;
+      gpuVram: string;
+      gpuArch: string;
+      gpuRecommended: string;
+      modelsAndEngines: string;
+      btnCopyReport: string;
+      btnCopyReportTooltip: string;
+      reportCopied: string;
+      copyReportError: string;
+      diagError: (err: string) => string;
+      statusActive: string;
+      statusMissing: string;
+      statusSupported: string;
+      statusNotSupported: string;
+      noAiEngines: string;
     };
     contextMenuConfig: {
       cmenuConfigTitle: string;
@@ -933,6 +1010,35 @@ export interface TranslationDict {
     volume: string;
     kbps: string;
     ch: string;
+    // Вкладки оверлея
+    tabSummary: string;
+    tabRendering: string;
+    tabTracks: string;
+    // Секция рендеринга и железа
+    hardwareTitle: string;
+    decoderTitle: string;
+    displaySyncTitle: string;
+    cpu: string;
+    ram: string;
+    gpu: string;
+    vram: string;
+    hwdec: string;
+    pixelFormat: string;
+    colorRange: string;
+    colorTransfer: string;
+    maxCllFall: string;
+    displayFps: string;
+    avSync: string;
+    voDelayed: string;
+    // Секция дорожек и глав
+    audioTracksTitle: string;
+    subTracksTitle: string;
+    chaptersTitle: string;
+    activeBadge: string;
+    noAudioTracks: string;
+    noSubTracks: string;
+    noChapters: string;
+    chapterCount: (current: number, total: number) => string;
   };
 
   // ─── Окно поиска по субтитрам (SubtitlesSearchModal) ───────────
@@ -1033,6 +1139,9 @@ export interface TranslationDict {
     upscaleOff: string;
     upscaleModel: (name: string) => string;
     upscaleModelNotFound: (index: number) => string;
+    upscaleNoFavorite: string;
+    upscaleFavoriteNotFound: (name: string) => string;
+    upscaleError: (err: string) => string;
     upscaleStatsAi: (slot: number, name: string, engine: string, stats: string) => string;
     upscaleStatsOff: (gpuHint: string) => string;
     visualizerStatus: (enabled: boolean) => string;

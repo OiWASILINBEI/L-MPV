@@ -15,7 +15,7 @@ import {
   optionCardStyle,
   optionResetBtnStyle,
   optionBtnStyle,
-  optionSectionDescStyle,
+  optionBtnClassName,
   optionBlockHeaderStyle,
   optionBlockTitleStyle,
   optionBlockTitleTextStyle,
@@ -92,10 +92,6 @@ export const VisualizerSettingsSection: React.FC<VisualizerSettingsSectionProps>
       title={dict.settings.appearance.controlButtons.visualizer}
     >
       <div className="col col-gap-5">
-        <span style={optionSectionDescStyle}>
-          {dict.settings.appearance.visualizer.desc}
-        </span>
-
         {/* Интерактивный предпросмотр аудио-визуализатора */}
         <VisualizerPreviewCard config={visualizerConfig} isVisible={isOpen} />
 
@@ -121,49 +117,22 @@ export const VisualizerSettingsSection: React.FC<VisualizerSettingsSectionProps>
                         THEME_ITEMS.find((t) => t.id === visualizerConfig.theme)?.label ||
                         "Тема плеера"}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateVisualizer({
-                          theme: DEFAULT_VISUALIZER_CONFIG.theme,
-                        })
-                      }
-                      className="btn btn--secondary btn--sm"
-                      style={{
-                        ...optionResetBtnStyle,
-                        opacity:
-                          visualizerConfig.theme !==
-                          DEFAULT_VISUALIZER_CONFIG.theme
-                            ? 1
-                            : 0,
-                        visibility:
-                          visualizerConfig.theme !==
-                          DEFAULT_VISUALIZER_CONFIG.theme
-                            ? "visible"
-                            : "hidden",
-                        pointerEvents:
-                          visualizerConfig.theme !==
-                          DEFAULT_VISUALIZER_CONFIG.theme
-                            ? "auto"
-                            : "none",
-                        transform:
-                          visualizerConfig.theme !==
-                          DEFAULT_VISUALIZER_CONFIG.theme
-                            ? "scale(1)"
-                            : "scale(0.85)",
-                        transition:
-                          "opacity var(--t-fast) var(--ease-smooth), transform var(--t-fast) var(--ease-smooth), visibility var(--t-fast) var(--ease-smooth)",
-                      }}
-                      tabIndex={
-                        visualizerConfig.theme !==
-                        DEFAULT_VISUALIZER_CONFIG.theme
-                          ? 0
-                          : -1
-                      }
-                      aria-label="Сбросить палитру спектра"
-                    >
-                      <RotateCcw size={11} />
-                    </button>
+                    {visualizerConfig.theme !== DEFAULT_VISUALIZER_CONFIG.theme && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateVisualizer({
+                            theme: DEFAULT_VISUALIZER_CONFIG.theme,
+                          })
+                        }
+                        className="btn btn--secondary btn--sm"
+                        style={optionResetBtnStyle}
+                        title={dict.settings.appearance.colorScheme.resetTheme}
+                        aria-label="Сбросить палитру спектра"
+                      >
+                        <RotateCcw size={11} />
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="player-themes-selector" style={{ padding: "var(--space-2) 2px" }}>
@@ -183,7 +152,7 @@ export const VisualizerSettingsSection: React.FC<VisualizerSettingsSectionProps>
                           background: THEME_SWATCH[item.id],
                           border: isSel
                             ? "2px solid #ffffff"
-                            : "1.5px solid rgba(255, 255, 255, 0.18)",
+                            : "none",
                           boxShadow: isSel
                             ? "0 0 14px rgba(255, 255, 255, 0.4), 0 2px 6px rgba(0, 0, 0, 0.4)"
                             : "none",
@@ -234,6 +203,7 @@ export const VisualizerSettingsSection: React.FC<VisualizerSettingsSectionProps>
                       <button
                         key={item.id}
                         type="button"
+                        className={optionBtnClassName(isSel)}
                         onClick={() => updateVisualizer({ placement: item.id })}
                         style={{ ...optionBtnStyle(isSel, "6px 8px"), height: "100%", minHeight: 38, boxSizing: "border-box" }}
                         title={itemDesc}
@@ -266,6 +236,7 @@ export const VisualizerSettingsSection: React.FC<VisualizerSettingsSectionProps>
                       <button
                         key={item.id}
                         type="button"
+                        className={optionBtnClassName(isSel)}
                         onClick={() => updateVisualizer({ mode: item.id })}
                         style={{ ...optionBtnStyle(isSel, "6px 6px"), height: "100%", minHeight: 38, boxSizing: "border-box" }}
                         title={itemDesc}

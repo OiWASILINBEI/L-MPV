@@ -133,7 +133,7 @@
 }
 
 .modal__close:hover {
-  background: var(--bg-hover);
+  background: var(--action-hover-veil);
   color: var(--text-primary);
 }
 
@@ -167,6 +167,14 @@
     animation: headerScrollElevation linear both;
     animation-timeline: --modal-body-scroll;
     animation-range: 0px 32px;
+  }
+
+  /* В окне настроек (стили Модерн и Классический) тень элевации отключена,
+     чтобы под шапкой и вкладками не возникало затемнения при листании контента */
+  .modal--settings .modal__header,
+  .modal--settings .settings-tabs {
+    animation: none !important;
+    box-shadow: none !important;
   }
 }
 
@@ -246,7 +254,7 @@
   background: var(--accent);
   color: var(--on-accent);
   box-shadow: none;
-  border-color: var(--accent);
+  border-color: var(--border-pill-hover);
 }
 
 .settings-action-btn--secondary {
@@ -256,8 +264,8 @@
 }
 
 .settings-action-btn--secondary:hover:not(:disabled) {
-  background: var(--surface-level-3-hover);
-  border-color: var(--border-hover);
+  background: var(--hover-veil);
+  border-color: var(--border-pill-hover);
   color: #ffffff;
 }
 
@@ -328,7 +336,7 @@
   color: var(--accent-text);
   background: var(--accent-glass);
   padding: 1px 5px;
-  border-radius: 9999px;
+  border-radius: var(--radius-xs);
   border: 1px solid var(--border-pill);
 }
 
@@ -349,7 +357,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid transparent;
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
   transition: transform var(--t-spring) var(--ease-spring-bounce),
               box-shadow var(--t-fast) var(--ease-smooth),
               border-color var(--t-fast) var(--ease-smooth);
@@ -357,18 +365,37 @@
   box-sizing: border-box;
 }
 
-.color-circle:hover {
+/* Keep only these small palette buttons on the same compositing path at rest
+   and during scaling. Demoting the layer after transition rerasterizes a
+   fractional-zoom edge at a different pixel boundary. */
+.color-circle--palette {
+  transform: scale(1);
+  will-change: transform;
+  transition-timing-function: var(--ease-smooth);
+}
+
+.color-circle--palette:hover:not(:disabled) {
+  transition-timing-function: var(--ease-spring-bounce), var(--ease-smooth), var(--ease-smooth);
+}
+
+.color-circle:hover:not(:disabled):not(.color-circle--empty) {
   transform: scale(1.18);
 }
 
-.color-circle:active {
+.color-circle:active:not(:disabled):not(.color-circle--empty) {
   transform: scale(0.92);
 }
 
 .color-circle--active {
+  border-width: 2px;
   border-color: #ffffff !important;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4) !important;
   transform: scale(1.12);
+}
+
+html.no-animations .color-circle--palette { will-change: auto; }
+@media (prefers-reduced-motion: reduce) {
+  .color-circle--palette { transition: none; will-change: auto; }
 }
 
 .color-circle--windows {
@@ -389,7 +416,7 @@
 
 .color-circle--add:hover {
   background: var(--accent-glass);
-  border-color: var(--accent);
+  border-color: var(--border-pill-hover);
   color: var(--accent-text);
   box-shadow: none;
 }
@@ -435,9 +462,7 @@
     grid-template-columns: 1fr;
     gap: var(--space-5);
   }
-  .color-column-card__grid {
-    grid-template-columns: repeat(6, 1fr);
-  }
+  .color-column-card__grid { grid-template-columns: repeat(6, 1fr); }
 }
 
 /* ─── Селектор тем оформления плеера ─────────────────── */
@@ -464,6 +489,8 @@
   padding: var(--space-3) 2px;
   overflow: visible;
 }
+
+.player-themes-selector .color-circle { flex-shrink: 0; }
 
 /* ─── Интерактивные карточки живого предпросмотра ────── */
 .settings-preview-card {
@@ -603,14 +630,14 @@
 }
 
 .visual-bar-card:hover {
-  background: var(--surface-level-3-hover);
+  background: var(--hover-veil);
   border-color: var(--border-pill-hover);
 }
 
 .visual-bar-card--active {
-  background: var(--surface-accent-subtle) !important;
-  border: 1.5px solid var(--accent) !important;
-  box-shadow: none !important;
+  background: rgba(var(--accent-rgb, 127, 199, 255), 0.16) !important;
+  border: 1px solid var(--selection-frame) !important;
+  box-shadow: inset 0 0 0 1.5px transparent !important;
 }
 
 /* ─── Реалистичное мини-превью стиля панели плеера ─── */
@@ -636,7 +663,7 @@
 }
 
 .visual-bar-card--active .visual-bar-preview {
-  border-color: var(--accent);
+  border-color: var(--selection-frame);
 }
 
 .visual-bar-preview__screen {
@@ -714,7 +741,7 @@
 .visual-bar-preview__capsule-group--right { justify-self: end; }
 
 .visual-bar-card--active .visual-bar-preview__capsule-islands {
-  border-color: var(--accent);
+  border-color: var(--selection-frame);
 }
 
 /* 2: Модерн (единый парящий остров) */
@@ -738,7 +765,7 @@
 }
 
 .visual-bar-card--active .visual-bar-preview__floating-island {
-  border-color: var(--accent);
+  border-color: var(--selection-frame);
   background: var(--bg-elevated);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
 }
@@ -950,6 +977,7 @@
 }
 
 .option-toggle-row {
+  border-radius: var(--radius-xs);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -994,7 +1022,6 @@
 .option-toggle-row:has(:focus-visible) {
   outline: 2px solid var(--accent);
   outline-offset: 4px;
-  border-radius: var(--radius-xs);
 }
 
 
@@ -1026,8 +1053,8 @@
   text-align: center;
   white-space: nowrap;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  box-sizing: border-box;
+  background-clip: padding-box;
   transition: background-color var(--t-fast) var(--ease-smooth),
               border-color var(--t-fast) var(--ease-smooth),
               color var(--t-fast) var(--ease-smooth),
@@ -1037,16 +1064,23 @@
 }
 
 .compact-segment-btn:hover {
-  background: var(--surface-level-3-hover);
+  background: var(--hover-veil);
   color: var(--text-primary);
   border-color: var(--border-pill-hover);
 }
 
+.option-block .compact-segment-btn {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+  padding-block: 5px;
+}
+
 .compact-segment-btn--active {
-  background: var(--surface-accent-subtle) !important;
+  background: rgba(var(--accent-rgb, 127, 199, 255), 0.16) !important;
   color: var(--text-primary) !important;
-  border-color: var(--accent) !important;
-  box-shadow: none !important;
+  border-color: var(--selection-frame) !important;
+  box-shadow: inset 0 0 0 1.5px transparent !important;
 }
 
 .compact-segment-btn--mono {
@@ -1140,7 +1174,7 @@
 
 .settings-footer__btn--version:hover {
   background: var(--surface-accent-hover);
-  border-color: var(--accent);
+  border-color: var(--border-pill-hover);
 }
 
 .settings-footer__btn--check {
@@ -1152,8 +1186,8 @@
 }
 
 .settings-footer__btn--check:hover {
-  background: var(--surface-level-3-hover);
-  border-color: var(--border-hover);
+  background: var(--hover-veil);
+  border-color: var(--border-pill-hover);
   color: #ffffff;
 }
 
@@ -1204,7 +1238,7 @@
 }
 
 .version-picker-trigger:hover {
-  background: rgba(var(--accent-rgb, 59, 130, 246), 0.28);
+  background: var(--hover-veil-float);
   border-color: var(--accent, #60a5fa);
   color: var(--accent-text);
 }
@@ -1216,7 +1250,7 @@
 }
 
 .version-picker-trigger--downgrade:hover {
-  background: rgba(var(--accent-rgb, 59, 130, 246), 0.28);
+  background: var(--hover-veil-float);
   border-color: var(--accent, #60a5fa);
 }
 
@@ -1248,7 +1282,7 @@
 
 .update-modal-btn--primary:hover:not(:disabled) {
   background: var(--surface-accent-subtle);
-  border-color: var(--accent);
+  border-color: var(--border-pill-hover);
   color: var(--accent-text);
 }
 
@@ -1264,8 +1298,8 @@
 }
 
 .update-modal-btn--secondary:hover:not(:disabled) {
-  background: var(--surface-level-3-hover);
-  border-color: var(--border-hover);
+  background: var(--hover-veil);
+  border-color: var(--border-pill-hover);
   color: var(--text-primary);
 }
 
@@ -1273,18 +1307,39 @@
   position: absolute;
   bottom: calc(100% + 8px);
   left: 0;
-  min-width: 280px;
-  max-width: 340px;
-  max-height: 260px;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
+  width: min(320px, calc(100vw - 48px));
+  box-sizing: border-box;
+  max-height: min(300px, calc(100dvh - 160px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--bg-elevated);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-pill);
+  border-radius: var(--radius-surface, 16px);
   box-shadow: var(--shadow-modal);
   padding: var(--space-3);
   z-index: var(--z-float);
   animation: versionPickerSlideUp var(--t-base) var(--ease-out);
+}
+
+.version-picker-list {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 0 var(--space-1) var(--space-1);
+}
+
+.update-modal--docked .version-picker-popover {
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-elevated);
+}
+
+.update-modal--modern .version-picker-popover {
+  border-radius: var(--radius-controls, 16px);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
 }
 
 /* Без opacity: фейд текста даёт snap ClearType в конце (см. modalSpringIn). */
@@ -1298,6 +1353,7 @@
 }
 
 .version-picker-header {
+  flex-shrink: 0;
   font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--text-muted, #9ca3af);
@@ -1314,15 +1370,16 @@
   justify-content: space-between;
   gap: var(--space-4);
   padding: var(--space-3) 10px;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-list-row);
   cursor: pointer;
   user-select: none;
   transition: background-color var(--t-fast) var(--ease-smooth);
   font-size: var(--fs-sm);
+  border: 1px solid transparent;
 }
 
 .version-picker-item:hover {
-  background: var(--surface-level-3-hover);
+  background: var(--hover-veil);
 }
 
 .version-picker-item--active {
@@ -1354,7 +1411,7 @@
 .version-picker-badge {
   font-size: var(--fs-2xs);
   padding: 1px 5px;
-  border-radius: 9999px;
+  border-radius: var(--radius-xs);
   font-weight: 600;
 }
 
@@ -1373,16 +1430,16 @@
 /* ─── Сворачиваемые секции (Аккордеон) ────────────────── */
 .hotkey-reset-btn:hover:not(:disabled),
 .hotkey-reset-btn:focus-visible {
-  background: var(--surface-level-3-hover) !important;
+  background: var(--hover-veil) !important;
   color: var(--text-primary) !important;
-  border-color: var(--border-hover) !important;
+  border-color: var(--border-pill-hover) !important;
 }
 
 .settings-accordion {
   background: var(--surface-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg, 12px);
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--settings-section-gap);
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32), 0 1px 3px rgba(0, 0, 0, 0.24);
   transition: border-color var(--t-fast) var(--ease-smooth),
@@ -1390,8 +1447,22 @@
               box-shadow var(--t-fast) var(--ease-smooth);
 }
 
+/* В flex-контейнерах с gap убираем margin-bottom аккордеонов, чтобы отступы не удваивались */
+.col > .settings-accordion,
+.system-settings > .settings-accordion {
+  margin-bottom: 0;
+}
+
+/* У последнего аккордеона в любой секции или вкладке отступ обнуляется,
+   чтобы нижнее поле окна было строго симметрично верхнему (16px) */
+.settings-tab-panel .settings-accordion:last-child,
+.modal__section > .settings-accordion:last-child,
+.settings-card__scroll-container .settings-accordion:last-child {
+  margin-bottom: 0 !important;
+}
+
 .settings-accordion:has(> .settings-accordion__header:hover) {
-  border-color: var(--border-hover);
+  border-color: var(--border-pill-hover);
   background: var(--surface-card-hover);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.38), 0 2px 5px rgba(0, 0, 0, 0.26);
 }
@@ -1415,7 +1486,7 @@
   gap: 12px;
   box-sizing: border-box;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 12px var(--settings-section-padding);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -1427,7 +1498,7 @@
 }
 
 .settings-accordion__header:hover {
-  background: var(--bg-hover);
+  background: var(--hover-veil);
 }
 
 .settings-accordion--open .settings-accordion__header {
@@ -1519,9 +1590,8 @@
 }
 
 .settings-accordion__body {
-  padding: 16px;
+  padding: var(--settings-section-padding);
   background: rgba(0, 0, 0, 0.16);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
   min-width: 0;
   overflow-wrap: anywhere;
   opacity: 1;
@@ -1541,13 +1611,15 @@
 
 /* ─── Вкладки и анимация переключения категорий в настройках ─── */
 .settings-tabs {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   align-items: center;
   border-bottom: 1px solid var(--border);
-  padding: var(--space-3) 10px;
+  padding: 5px 6px;
   background: rgba(0, 0, 0, 0.15);
   flex-shrink: 0;
   gap: var(--space-2);
+  overflow-x: auto;
 }
 
 .settings-tab-btn {
@@ -1556,12 +1628,14 @@
   justify-content: center;
   flex: 1 1 0;
   min-width: 0;
-  gap: var(--space-3);
-  padding: var(--space-3) 8px;
+  gap: 4px;
+  padding: 5px 3px;
   background: transparent;
-  /* Рамка всегда 1.5px (прозрачная по умолчанию): переключение active
-     больше не меняет геометрию и не сдвигает иконки соседних вкладок. */
-  border: 1.5px solid transparent;
+  /* Рамка всегда целочисленная 1px: переключение active
+     не меняет геометрию и обеспечивает четкое субпиксельное сглаживание углов. */
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  box-sizing: border-box;
   color: var(--text-secondary);
   font-size: var(--fs-sm);
   font-weight: 500;
@@ -1585,14 +1659,20 @@
 }
 
 .settings-tab-label {
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: normal;
+  line-height: 1.2;
+  text-align: center;
 }
 
+/* Вкладки — исключение из hover-контракта: только фон, без рамки.
+   Рамка вкладки читалась как «выделение» и путалась с активной вкладкой
+   (как в окне MediaInfo, где так и сделано). */
 .settings-tab-btn:hover {
   color: var(--text-primary);
-  background: var(--surface-level-3-hover);
+  background: var(--hover-veil);
+  border-color: transparent;
 }
 
 .settings-tab-btn:active {
@@ -1601,11 +1681,11 @@
 
 .settings-tab-btn--active {
   color: var(--text-primary);
-  background: var(--surface-accent-subtle);
-  border-color: var(--accent);
+  background: rgba(var(--accent-rgb, 127, 199, 255), 0.16);
+  border-color: var(--selection-frame);
   /* font-weight НЕ меняется (500): смена 500->600 расширяла подпись,
      отбирала ширину у соседних кнопок (flex:1) и сдвигала все иконки. */
-  box-shadow: inset 0 0 0 1px transparent;
+  box-shadow: inset 0 0 0 1.5px transparent;
 }
 
 .settings-tab-btn--active svg {
@@ -1762,14 +1842,15 @@
   --tab-sub-radius: max(0px, calc(var(--radius-controls, 16px) - var(--tabs-card-padding) - var(--tabs-card-border)));
   flex: 1;
   min-width: 0;
-  height: 42px;
+  height: auto;
   min-height: 42px;
-  padding: var(--tabs-card-padding) 6px;
-  display: flex;
+  padding: var(--tabs-card-padding);
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   align-items: center;
   justify-content: space-between;
   gap: 4px;
-  overflow-x: auto;
+  overflow: visible;
   scrollbar-width: none;
 }
 
@@ -1782,10 +1863,10 @@
 .settings-side-panel--capsule .settings-card--tabs .settings-tab-btn {
   flex: 1 1 0;
   min-width: 0;
-  height: 32px;
+  height: 100%;
   min-height: 32px;
-  padding: 4px 8px;
-  gap: 5px;
+  padding: 4px 3px;
+  gap: 3px;
   font-size: var(--fs-xs, 12px);
   border-radius: var(--tab-sub-radius);
   border: 1px solid transparent;
@@ -1799,16 +1880,17 @@
 .modal--settings-capsule .settings-card--tabs .settings-tab-btn:hover,
 .settings-side-panel--capsule .settings-card--tabs .settings-tab-btn:hover {
   color: var(--text-primary);
-  background: var(--surface-level-3-hover);
+  background: var(--hover-veil);
+  border-color: transparent;
 }
 
 .modal--settings-capsule .settings-card--tabs .settings-tab-btn--active,
 .settings-side-panel--capsule .settings-card--tabs .settings-tab-btn--active {
   border-radius: var(--tab-sub-radius);
-  background: var(--surface-accent-subtle);
-  border-color: var(--accent);
+  background: rgba(var(--accent-rgb, 127, 199, 255), 0.16);
+  border-color: var(--selection-frame);
   color: var(--text-primary);
-  box-shadow: inset 0 0 0 1px transparent;
+  box-shadow: inset 0 0 0 1.5px transparent;
 }
 
 .modal--settings-capsule .settings-card--tabs .settings-tab-btn--active:hover,
@@ -1825,7 +1907,7 @@
   min-height: 14px;
 }
 
-/* Карточка 3 (справа): крестик (сама карточка статична, вращается только svg) */
+/* Карточка 3: статичная поверхность с отдельной внутренней кнопкой. */
 .modal--settings-capsule .settings-card--close,
 .settings-side-panel--capsule .settings-card--close {
   width: 42px;
@@ -1864,14 +1946,6 @@
   height: 18px;
   display: block;
   flex-shrink: 0;
-  transform-origin: center center;
-  transform: rotate(0deg);
-  transition: transform var(--t-spring, 260ms) var(--ease-spring-smooth);
-}
-
-.modal--settings-capsule .settings-card--close:hover svg,
-.settings-side-panel--capsule .settings-card--close:hover svg {
-  transform: rotate(90deg);
 }
 
 /* 2. Центральная карточка: тело настроек */
@@ -1891,7 +1965,7 @@
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
-  padding: 16px 20px;
+  padding: var(--settings-section-padding) 20px;
   overflow-y: auto;
   overflow-x: hidden;
   box-sizing: border-box;
@@ -2049,7 +2123,7 @@
 }
 
 .viz-power-btn:hover {
-  background: var(--surface-level-3-hover);
+  background: var(--hover-veil);
   border-color: var(--border-pill-hover);
   color: var(--text-primary);
 }
@@ -2060,13 +2134,13 @@
 
 .viz-power-btn--active {
   background: var(--surface-accent-subtle) !important;
-  border-color: var(--accent) !important;
+  border-color: var(--selection-frame) !important;
   color: var(--accent-text) !important;
 }
 
 .viz-power-btn--active:hover {
   background: var(--surface-accent-subtle) !important;
-  border-color: var(--accent) !important;
+  border-color: var(--selection-frame) !important;
   color: var(--accent-text) !important;
   filter: brightness(1.12);
 }
@@ -2083,7 +2157,7 @@
   border-radius: 50%;
   background: var(--accent);
   margin-top: -4.5px;
-  box-shadow: 0 0 6px var(--surface-accent-glow);
+  box-shadow: none;
   cursor: pointer;
   border: none;
   transition: transform var(--t-spring) var(--ease-spring-bounce),
@@ -2092,11 +2166,12 @@
 
 .ui-premium-slider:hover::-webkit-slider-thumb {
   transform: scale(1.25);
-  box-shadow: 0 0 12px var(--surface-accent-glow);
+  box-shadow: 0 0 10px var(--surface-accent-glow);
 }
 
 .ui-premium-slider:active::-webkit-slider-thumb {
   transform: scale(1.1);
+  box-shadow: 0 0 12px var(--surface-accent-glow);
 }
 
 .ui-premium-slider::-moz-range-track {
@@ -2111,9 +2186,21 @@
   height: 12px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 6px var(--surface-accent-glow);
+  box-shadow: none;
   cursor: pointer;
   border: none;
+  transition: transform var(--t-spring) var(--ease-spring-bounce),
+              box-shadow var(--t-fast) var(--ease-smooth);
+}
+
+.ui-premium-slider:hover::-moz-range-thumb {
+  transform: scale(1.25);
+  box-shadow: 0 0 10px var(--surface-accent-glow);
+}
+
+.ui-premium-slider:active::-moz-range-thumb {
+  transform: scale(1.1);
+  box-shadow: 0 0 12px var(--surface-accent-glow);
 }
 
 /* ─── Конфигуратор ПКМ-меню ──────────────────────────────────────────────── */
@@ -2234,6 +2321,12 @@
   background: var(--accent);
 }
 
+/* Stable measuring slots: only their children animate during sorting. */
+.cmenu-entry-slot {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
 /* Карточка пункта */
 .cmenu-entry {
   display: flex;
@@ -2253,8 +2346,8 @@
 }
 
 .cmenu-entry:hover:not(:has(button:hover, input:hover, select:hover, textarea:hover, a:hover, label:hover, [role="button"]:hover)) {
-  background: var(--surface-level-3-hover);
-  border-color: var(--border-hover);
+  background: var(--hover-veil);
+  border-color: var(--border-pill-hover);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
 }
 
@@ -2263,8 +2356,7 @@
 }
 
 .cmenu-entry--dragging {
-  opacity: 0.35 !important;
-  border-style: dashed;
+  visibility: hidden;
 }
 
 /* Карточка-оверлей при перетаскивании */
@@ -2273,12 +2365,11 @@
   max-width: 100%;
   box-sizing: border-box;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5),
-              0 0 0 2px var(--accent),
               0 0 20px var(--surface-accent-glow);
   background: var(--bg-elevated) !important;
-  border-color: var(--accent) !important;
+  border-color: var(--selection-frame) !important;
   cursor: grabbing !important;
-  transform: scale(1.02);
+  height: 100%;
   pointer-events: none !important;
   user-select: none !important;
   z-index: var(--z-window);
@@ -2293,7 +2384,7 @@
 
 .cmenu-entry--divider:hover:not(:has(button:hover, input:hover, select:hover, textarea:hover, a:hover, label:hover, [role="button"]:hover)) {
   background: var(--surface-level-2);
-  border-color: var(--border-hover);
+  border-color: var(--border-pill-hover);
 }
 
 .cmenu-entry__divider-line {
@@ -2338,7 +2429,7 @@
 .cmenu-entry--overlay .cmenu-entry__grip {
   opacity: 0.95;
   color: var(--text-primary);
-  background: var(--surface-level-3-hover);
+  background: var(--hover-veil);
 }
 
 .cmenu-entry__grip:active {
@@ -2450,7 +2541,7 @@
 }
 
 .cmenu-editor__add-divider-btn:hover {
-  border-color: var(--accent);
+  border-color: var(--border-pill-hover);
   color: var(--accent-text);
   background: var(--accent-glass);
 }
@@ -2505,8 +2596,8 @@
 }
 
 .cmenu-available-item:hover {
-  background: var(--surface-level-3-hover);
-  border-color: var(--border-hover);
+  background: var(--hover-veil);
+  border-color: var(--border-pill-hover);
 }
 
 .cmenu-available-item__icon {
@@ -2556,7 +2647,7 @@
 
 .cmenu-available-item__add:hover {
   color: var(--accent-text);
-  border-color: var(--accent);
+  border-color: var(--border-pill-hover);
   background: var(--accent-glass);
 }
 
@@ -2570,9 +2661,9 @@
 .update-modal-capsule {
   position: relative;
   width: 500px;
-  max-width: 94vw;
+  max-width: min(94vw, calc(100vw / var(--ui-scale, 1) - 24px));
   height: 480px;
-  max-height: 92vh;
+  max-height: min(92vh, calc(100dvh / var(--ui-scale, 1) - 24px));
   display: flex;
   flex-direction: column;
   gap: 10px !important;
@@ -2598,7 +2689,10 @@
 
 .update-modal-capsule .update-card {
   background: var(--bg-glass, var(--bg-modal-solid, #11141c));
-  border: 1px solid var(--border-pill, rgba(255, 255, 255, 0.08));
+  /* Нейтральная рамка: --border-pill тонирован акцентом, из-за чего окно
+     обновления выглядело «обведённым» без наведения. Акцент приходит
+     на hover и в выделенных элементах, а не в рамке контейнера. */
+  border: 1px solid var(--border);
   border-radius: var(--radius-controls, var(--radius-lg, 16px));
   box-shadow: var(--shadow-elevated, 0 8px 32px rgba(0, 0, 0, 0.35));
   backdrop-filter: blur(16px);
@@ -2626,6 +2720,34 @@
   min-height: 52px;
   cursor: default;
   user-select: none;
+}
+
+/* Островок-логотип окна обновления: самостоятельная карточка рядом с
+   инфо-островком (как иконка настроек в окне настроек). Фон и контур —
+   как у соседних карточек, без отдельной «плашки» внутри инфо-карточки. */
+.update-modal-capsule .update-card--logo {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  min-height: 52px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+  line-height: 0;
+  border-radius: var(--radius-controls, var(--radius-lg, 16px));
+}
+
+.update-modal-capsule .update-card--logo svg {
+  width: 28px;
+  height: 28px;
+  display: block;
+  margin: 0;
+  padding: 0;
 }
 
 .update-modal-capsule .update-card__logo-badge {
@@ -2697,30 +2819,26 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border-radius: max(0px, calc(var(--radius-controls, 16px) - 6px));
+  border-radius: var(--radius-control);
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: all var(--t-fast) var(--ease-smooth);
+  transition: background-color var(--t-fast) var(--ease-smooth),
+              color var(--t-fast) var(--ease-smooth),
+              border-color var(--t-fast) var(--ease-smooth);
 }
 
 .update-modal-capsule .update-card__action-btn:hover {
-  background: var(--surface-level-3-hover);
-  border-color: var(--border-hover);
-  color: var(--text-primary);
+  background: var(--action-hover-veil);
+  border-color: transparent;
+  color: var(--accent-text);
+  box-shadow: none;
 }
 
 .update-modal-capsule .update-card__action-btn svg {
   display: block;
   flex-shrink: 0;
-  transform-origin: center center;
-  transform: rotate(0deg);
-  transition: transform var(--t-spring, 260ms) var(--ease-spring-smooth);
-}
-
-.update-modal-capsule .update-card__action-btn--close:hover svg {
-  transform: rotate(90deg);
 }
 
 /* 2. Центральная карточка: тело релиза / заметки о версии */
@@ -2756,19 +2874,21 @@
   align-items: center;
   gap: 6px;
   background: var(--surface-level-3);
-  border: 1px solid var(--border-pill, rgba(255, 255, 255, 0.1));
-  border-radius: max(0px, calc(var(--radius-controls, 16px) - 6px));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
   padding: 4px 10px;
   font-size: var(--fs-xs, 12px);
   color: var(--accent-text);
   cursor: pointer;
-  transition: all var(--t-fast) var(--ease-smooth);
+  transition: background-color var(--t-fast) var(--ease-smooth),
+              color var(--t-fast) var(--ease-smooth),
+              border-color var(--t-fast) var(--ease-smooth);
 }
 
 .update-modal-capsule .update-card__github-btn:hover {
-  background: var(--surface-level-3-hover);
-  border-color: var(--border-hover);
-  color: #ffffff;
+  background: var(--hover-veil);
+  border-color: var(--border-pill-hover);
+  color: var(--accent-text);
 }
 
 /* Контейнер заметок со скроллом */
@@ -2779,7 +2899,7 @@
   overflow-x: hidden;
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: max(0px, calc(var(--radius-controls, 16px) - 6px));
+  border-radius: var(--radius-md);
   padding: 12px 14px;
   position: relative;
 }
@@ -2829,7 +2949,7 @@
   padding: 0 16px;
   font-size: var(--fs-sm, 13px);
   font-weight: 500;
-  border-radius: max(0px, calc(var(--radius-controls, 16px) - 6px));
+  border-radius: var(--radius-control);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -2846,15 +2966,17 @@
 }
 
 .update-modal-capsule .update-card__btn--secondary:hover {
-  background: var(--surface-level-3-hover);
-  border-color: var(--border-hover);
+  background: var(--hover-veil);
+  border-color: var(--border-pill-hover);
   color: var(--text-primary);
 }
 
 .update-modal-capsule .update-card__btn--primary,
 .update-modal-capsule .update-card__btn--downgrade {
   background: var(--surface-accent-subtle);
-  border: 1px solid var(--accent);
+  /* Рамки в покое нет: акцентную заливку и так видно, а постоянная
+     обводка читалась как «элемент в рамке» даже без наведения. */
+  border: 1px solid transparent;
   color: var(--accent-text);
   font-weight: 600;
   box-shadow: none !important;
@@ -2862,8 +2984,8 @@
 
 .update-modal-capsule .update-card__btn--primary:hover,
 .update-modal-capsule .update-card__btn--downgrade:hover {
-  background: var(--surface-accent-subtle);
-  border-color: var(--accent);
+  background: var(--surface-accent-hover);
+  border-color: var(--border-pill-hover);
   color: var(--accent-text);
   box-shadow: none !important;
   filter: none !important;
@@ -2879,19 +3001,21 @@
 /* Концентрическое скругление и стиль поповера версий в стиле Капсула */
 .update-modal-capsule .version-picker-trigger,
 .update-modal-capsule .version-picker-trigger--downgrade {
-  border-radius: max(0px, calc(var(--radius-controls, 16px) - 6px));
+  border-radius: var(--radius-control);
   height: 32px;
   box-shadow: none !important;
   background: var(--accent-glass, rgba(var(--accent-rgb, 127, 199, 255), 0.12));
-  border: 1px solid var(--border-pill, rgba(var(--accent-rgb, 127, 199, 255), 0.22));
+  border: 1px solid transparent;
   color: var(--accent-text);
-  transition: all var(--t-fast) var(--ease-smooth);
+  transition: background-color var(--t-fast) var(--ease-smooth),
+              color var(--t-fast) var(--ease-smooth),
+              border-color var(--t-fast) var(--ease-smooth);
 }
 
 .update-modal-capsule .version-picker-trigger:hover,
 .update-modal-capsule .version-picker-trigger--downgrade:hover {
-  background: var(--surface-accent-subtle);
-  border-color: var(--accent);
+  background: var(--surface-accent-hover);
+  border-color: var(--border-pill-hover);
   color: var(--accent-text);
   box-shadow: none !important;
 }
@@ -2903,4 +3027,35 @@
   box-shadow: var(--shadow-elevated, 0 10px 30px rgba(0, 0, 0, 0.5));
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+}
+
+/* Fit equal tabs inside narrow settings without scrolling or omitted labels. */
+@container settings-shell (max-width: 680px) {
+  .settings-tab-btn,
+  .settings-card--tabs .settings-tab-btn {
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 2px;
+    font-size: var(--fs-2xs);
+  }
+}
+
+@container settings-shell (max-width: 420px) {
+  .settings-tabs, .settings-card.settings-card--tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* Let actions grow vertically instead of clipping translated labels at high UI scales. */
+.update-modal-card, .update-modal-capsule { container: update-dialog / inline-size; overflow-wrap: anywhere; }
+.update-modal-footer { min-width: 0; flex-wrap: wrap; }
+.update-modal-footer .update-modal-actions { display: flex; align-items: center; justify-content: flex-end; flex: 1 1 auto; min-width: 0; gap: var(--space-4); flex-wrap: wrap; }
+.update-modal-footer .version-picker-wrap { min-width: 0; max-width: 100%; }
+.update-modal-footer .version-picker-trigger { max-width: 100%; min-height: 32px; height: auto; padding-block: 7px; line-height: 1.3; }
+.update-modal-footer .version-picker-trigger span { min-width: 0; overflow-wrap: anywhere; }
+.update-modal-footer .update-modal-actions button { min-width: 0; max-width: 100%; min-height: 32px; height: auto; padding-block: 7px; line-height: 1.3; }
+.update-modal-footer .update-modal-actions button, .update-modal-actions .nowrap { white-space: normal; overflow-wrap: anywhere; }
+.update-modal-actions button > svg { flex-shrink: 0; }
+.update-modal-actions button > span { min-width: 0; }
+@container update-dialog (max-width: 460px) {
+  .update-modal-footer .update-modal-actions { flex-basis: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .update-modal-actions > :only-child { grid-column: 1 / -1; }
 }

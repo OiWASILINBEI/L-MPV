@@ -115,12 +115,17 @@ textarea {
   overscroll-behavior: contain;
 }
 
+/* Keep rem tokens based on the browser's default (normally 16px).
+   Applying --fs-base to html would shrink the entire rem scale to 87.5%. */
+html {
+  font-size: 100%;
+}
+
 html, body, #root {
   width: 100%;
   height: 100%;
   overflow: hidden;
   font-family: var(--font-family);
-  font-size: var(--fs-base);
   color: var(--text-primary);
   background: transparent;
   -webkit-font-smoothing: subpixel-antialiased;
@@ -130,6 +135,10 @@ html, body, #root {
   font-synthesis: none;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
   user-select: none;
+}
+
+body, #root {
+  font-size: var(--fs-base);
 }
 
 /* ─── Контейнер приложения ───────────────────────────── */
@@ -222,96 +231,74 @@ html, body, #root {
   color: #fef2f2;
 }
 
-/* ─── Всплывающая плашка времени на таймлайне ─── */
+/* ─── Всплывающая плашка времени на таймлайне (Zero-Blur DirectWrite ClearType) ─── */
 .timeline-preview-card {
   position: absolute;
   bottom: calc(100% + 10px);
   transform: translateX(-50%);
-  background: var(--bg-elevated);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  /* Глубокая монолитная подложка без backdrop-filter для сохранения кристальной четкости DirectWrite ClearType на 96 DPI */
+  background: var(--bg-modal-solid, #11141c);
   border: 1px solid var(--border-pill);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) 10px;
-  box-shadow: var(--shadow-card-hover);
+  border-radius: var(--radius-md);
+  padding: 5px 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.65),
+              0 1px 3px rgba(0, 0, 0, 0.45),
+              inset 0 1px 0 rgba(255, 255, 255, 0.1);
   pointer-events: none;
   z-index: var(--z-float);
   white-space: nowrap;
-  /* БЕЗ entrance-анимации: элемент пересоздаётся на каждый rAF-кадр ховера,
-     любая анимация рестартовала бы 60 раз/сек и давала мерцание.
-     Позиция обновляется через rAF-троттлинг в Timeline.tsx. */
+  user-select: none;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
+  text-rendering: optimizeLegibility;
+  font-synthesis: none;
   opacity: 1;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  will-change: transform;
-  contain: layout paint;
 }
 
-/* Смещение карточки превью выше парящей звуковой карты */
+.timeline-preview-card--with-chapter {
+  padding: 6px 14px 7px;
+  gap: 3px;
+}
+
+/* Смещение карточки превью выше парящей звуковой карты (зазор 8px над тепловой картой) */
 .timeline:has(.waveform-activity-strip--visible) .timeline-preview-card,
 .player-controls:has(.waveform-activity-strip--visible) .timeline-preview-card {
-  bottom: calc(100% + 58px);
+  bottom: calc(100% + var(--heatmap-strip-height, 34px) + 18px);
 }
 
 .player-controls--has-visualizer-above .timeline:has(.waveform-activity-strip--visible) .timeline-preview-card,
 .player-controls--has-visualizer-above:has(.waveform-activity-strip--visible) .timeline-preview-card {
-  bottom: calc(100% + var(--visualizer-height, 22px) + 58px);
+  bottom: calc(100% + var(--visualizer-height, 22px) + var(--heatmap-strip-height, 34px) + 18px);
 }
 
-
 .timeline-preview-card__time {
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: #ffffff;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+  -webkit-font-smoothing: subpixel-antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .timeline-preview-card__chapter {
-  font-size: var(--fs-3xs);
+  font-size: var(--fs-xs);
   font-weight: 500;
   color: var(--text-secondary);
-  margin-top: var(--space-1);
-  max-width: 150px;
+  line-height: 1.25;
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* ─── Унифицированное центрированное вращение крестиков (Close & Clear) ── */
-.modal__close svg,
-.settings-card--close svg,
-.update-card__action-btn--close svg,
-.titlebar__btn--close svg,
-.playlist-drawer__close svg,
-.side-panel__close svg,
-.mediainfo-floating-window__btn--close svg,
-.mediainfo-standalone__control-btn--close svg,
-.update-toast__close svg,
-.mediainfo-standalone__btn-icon svg,
-.mediainfo-floating-window__search-clear svg,
-.color-circle__remove-btn svg {
-  display: block;
-  flex-shrink: 0;
-  margin: 0;
-  padding: 0;
-  transform-origin: center center;
-  transform: rotate(0deg);
-  transition: transform var(--t-spring, 260ms) var(--ease-spring-smooth);
-}
-
-.modal__close:hover svg,
-.settings-card--close:hover svg,
-.update-card__action-btn--close:hover svg,
-.titlebar__btn--close:hover svg,
-.playlist-drawer__close:hover svg,
-.side-panel__close:hover svg,
-.mediainfo-floating-window__btn--close:hover svg,
-.mediainfo-standalone__control-btn--close:hover svg,
-.update-toast__close:hover svg,
-.mediainfo-standalone__btn-icon:hover svg,
-.mediainfo-floating-window__search-clear:hover svg,
-.color-circle__remove-btn:hover svg {
-  transform: rotate(90deg);
+  -webkit-font-smoothing: subpixel-antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 /* ─── Отключение анимаций при выключении в настройках ──

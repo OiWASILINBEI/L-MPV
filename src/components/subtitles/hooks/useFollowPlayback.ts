@@ -109,6 +109,8 @@ export function useFollowPlayback({
         );
       }
 
+      let needsAnotherTick = false;
+
       if (targetEl && targetEl.isConnected) {
         missFrames = 0;
         // Элемент присутствует в DOM — центруем по нему точно
@@ -131,8 +133,9 @@ export function useFollowPlayback({
             Math.min(container.scrollTop + step, maxTop)
           );
           container.scrollTop = next;
-          expectedScrollTopRef.current = next;
-          scrollOffsetRef.current = next;
+          expectedScrollTopRef.current = container.scrollTop;
+          scrollOffsetRef.current = container.scrollTop;
+          needsAnotherTick = true;
         }
       } else if (activeLineIndex >= 0) {
         // Защита: не прыгаем по грубой estimatedRowHeight сразу в первом же кадре смены реплики,
@@ -161,14 +164,19 @@ export function useFollowPlayback({
                 Math.min(container.scrollTop + step, maxTop)
               );
               container.scrollTop = next;
-              expectedScrollTopRef.current = next;
-              scrollOffsetRef.current = next;
+              expectedScrollTopRef.current = container.scrollTop;
+              scrollOffsetRef.current = container.scrollTop;
+              needsAnotherTick = true;
             }
           }
+        } else {
+          needsAnotherTick = true;
         }
       }
 
-      rafId = requestAnimationFrame(tick);
+      if (needsAnotherTick) {
+        rafId = requestAnimationFrame(tick);
+      }
     };
 
     rafId = requestAnimationFrame(tick);

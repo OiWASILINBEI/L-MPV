@@ -1,12 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import App from "./App";
-import { StandaloneMediaInfoWindow } from "./components/modals/StandaloneMediaInfoWindow";
 import "./index.css";
 import "./styles/settings-panel.css";
-import { PlayerStateProvider } from "./contexts/PlayerStateContext";
-import { LanguageProvider } from "./i18n/LanguageContext";
 import { applyPlayerTheme } from "./utils/colorUtils";
 import { initSurfaceHierarchy } from "./utils/surfaceHierarchy";
 // 汉化版补丁挂点：拖动视频画面移动窗口等改动都在 src/zh-cn/ 里
@@ -16,6 +12,11 @@ import {
   initUiSettingsAutoSync,
   applyAllVisualSettings,
 } from "./utils/uiSettingsSync";
+
+const PlayerRoot = React.lazy(() => import("./PlayerRoot"));
+const StandaloneMediaInfoWindow = React.lazy(() =>
+  import("./components/modals/StandaloneMediaInfoWindow").then(module => ({ default: module.StandaloneMediaInfoWindow }))
+);
 
 // Безопасное определение текущего окна Tauri (главное окно плеера или отдельное окно MediaInfo)
 const checkIsMediaInfoWindow = (): boolean => {
@@ -143,7 +144,7 @@ class GlobalErrorBoundary extends React.Component<
               background: "rgba(255,255,255,0.1)",
               border: "1px solid rgba(255,255,255,0.2)",
               color: "#fff",
-              borderRadius: 6,
+              borderRadius: "var(--radius-xs)",
               cursor: "pointer",
             }}
             >
@@ -161,15 +162,13 @@ ReactDOM.createRoot(
   ).render(
   <React.StrictMode>
     <GlobalErrorBoundary>
+      <React.Suspense fallback={null}>
       {isMediaInfoWindow ? (
         <StandaloneMediaInfoWindow />
       ) : (
-        <LanguageProvider>
-          <PlayerStateProvider>
-            <App />
-          </PlayerStateProvider>
-        </LanguageProvider>
+        <PlayerRoot />
       )}
+      </React.Suspense>
     </GlobalErrorBoundary>
   </React.StrictMode>
   );

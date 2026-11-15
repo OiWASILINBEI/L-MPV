@@ -84,7 +84,7 @@ requirePattern("src/components/player/PlayerControls.tsx", playerControls, /stat
 const mpvMgr = readFile("src-tauri/src/mpv_manager.rs");
 requirePattern("src-tauri/src/mpv_manager.rs", mpvMgr, /load-stats-overlay/, "内置 stats 禁用（让位给 v30）");
 
-// 8) build 6：stats 位置补丁、数字键翻页、链接播放
+// 8) v2.7.3：stats 位置补丁、数字键翻页、链接播放
 const statsLua = readFile("bundled/portable-assets/config/scripts/stats.lua");
 requirePattern("bundled/portable-assets/config/scripts/stats.lua", statsLua, /\\pos\(5\.5,14\)/, "stats 面板位置补丁 pos(5.5,14)");
 requirePattern("src/App.tsx", appTsx, /display-page-\$\{page\}-toggle/, "数字键 1~4 转发 stats 翻页（4 映射轨道信息页）");

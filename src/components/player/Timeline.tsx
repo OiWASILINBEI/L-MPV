@@ -1,9 +1,12 @@
+import { isTimelinePreviewEnabled } from "../../utils/timelinePreviewPreference";
+import { supportsTrickplaySize } from "../../utils/timelineThumbnail";
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { usePlayerState, usePlayerProgress } from "../../contexts/PlayerStateContext";
 import { useTranslation } from "../../i18n/LanguageContext";
 import { formatTime } from "../../utils/timeUtils";
 import { AudioVisualizer } from "./AudioVisualizer";
 import { useLiveScrubbing } from "./useLiveScrubbing";
+import { TimelinePreview } from "./timeline/TimelinePreview";
 import { useNeonPulse } from "./useNeonPulse";
 import { isMotionAllowed } from "../../utils/animationUtils";
 import { getSavedSeekStepSeconds, triggerSeekIndicator } from "../../utils/seekUtils";
@@ -117,30 +120,6 @@ const TimelineSegment = React.memo<TimelineSegmentProps>(
   );
 TimelineSegment.displayName = "TimelineSegment";
 
-interface TimelinePreviewProps {
-  hoverInfo: { ratio: number; time: number };
-  segments: TimelineSegmentData[];
-  mediaPath: string;
-}
-
-const TimelinePreview = React.memo<TimelinePreviewProps>(({ hoverInfo, segments, mediaPath }) => {
-  const active =
-    segments.find((s) => hoverInfo.time>= s.start && hoverInfo.time <= s.end) ||
-    segments[segments.length - 1];
-  const showChapter = Boolean(active?.title && active.title !== mediaPath);
-
-  return (
-    <div
-      className="timeline-preview-card"
-      style={{ left: `clamp(48px, ${hoverInfo.ratio * 100}%, calc(100% - 48px))` }}
-      >
-      <div className="timeline-preview-card__time">{formatTime(hoverInfo.time)}</div>
-      {showChapter && <div className="timeline-preview-card__chapter">{active.title}</div>}
-    </div>
-  );
-});
-TimelinePreview.displayName = "TimelinePreview";
-
 // ─── Главный компонент ────────────────────────────────────────────────────────
 
 /**
@@ -158,6 +137,7 @@ export const Timeline = React.memo(() => {
   const { dict } = useTranslation();
   const {
     mediaInfo,
+    tracks,
     chapters,
     seekTo,
     seekBy,
@@ -166,6 +146,12 @@ export const Timeline = React.memo(() => {
     prolongControlsIfActive,
   } = usePlayerState();
   const { position, duration, seeking, seekTarget } = usePlayerProgress();
+  const [previewEnabled, setPreviewEnabled] = useState(isTimelinePreviewEnabled);
+  useEffect(() => {
+    const sync = () => setPreviewEnabled(isTimelinePreviewEnabled());
+    window.addEventListener("l-mpv-settings-changed", sync);
+    return () => window.removeEventListener("l-mpv-settings-changed", sync);
+  }, []);
   const mediaPath = mediaInfo?.path || "";
 
   const { scheduleScrub, cancelScrub } = useLiveScrubbing();
@@ -449,7 +435,10 @@ export const Timeline = React.memo(() => {
       <AudioVisualizer placement="inside_timeline" />
 
       {hoverInfo && (
-        <TimelinePreview hoverInfo={hoverInfo} segments={segments} mediaPath={mediaPath} />
+        <TimelinePreview previewEnabled={previewEnabled} hoverInfo={hoverInfo} segments={segments} mediaPath={mediaPath}
+          trickplay={supportsTrickplaySize(mediaInfo?.width ?? 0, mediaInfo?.height ?? 0)}
+          hasVideo={mediaInfo?.has_video ?? false}
+          videoTrack={tracks.find((track) => track.type === "video" && track.selected)?.id ?? null} />
       )}
 
 

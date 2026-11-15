@@ -125,7 +125,9 @@
   flex-shrink: 0;
   padding: 0;
   background: transparent;
-  border: 1.5px solid transparent;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  box-sizing: border-box;
   border-radius: var(--radius-control);
   color: var(--text-muted);
   cursor: pointer;
@@ -133,15 +135,15 @@
 }
 
 .settings-side-panel__nav-btn:hover {
-  background: var(--bg-hover);
+  background: var(--hover-veil);
   color: var(--text-primary);
 }
 
 .settings-side-panel__nav-btn--active {
   background: var(--surface-accent-subtle);
   color: var(--accent-text);
-  border-color: var(--accent);
-  box-shadow: 0 0 7px var(--surface-accent-glow);
+  border-color: var(--selection-frame);
+  box-shadow: var(--selection-shadow);
 }
 
 .settings-side-panel__nav-btn--active:hover {
@@ -172,7 +174,8 @@
 }
 
 .settings-side-panel__close:hover {
-  background: var(--bg-hover);
+  background: var(--action-hover-veil);
+  border-color: var(--border-pill-hover);
   color: var(--text-primary);
 }
 
@@ -185,7 +188,7 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: var(--space-7) 20px 10px;
+  padding: var(--settings-section-padding) 20px;
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
   scrollbar-gutter: auto !important;
@@ -200,24 +203,11 @@
   height: 0 !important;
 }
 
-/* ─── Scroll-Driven Animation: Плавная тень шапки навигации без JS (Chromium 115+) ─── */
-@supports (animation-timeline: scroll()) {
-  .settings-side-panel {
-    timeline-scope: --settings-scroll;
-  }
-
-  .settings-side-panel__scroll {
-    scroll-timeline-name: --settings-scroll;
-    scroll-timeline-axis: block;
-  }
-
-  .settings-side-panel__nav {
-    position: relative;
-    z-index: 2;
-    animation: headerScrollElevation linear both;
-    animation-timeline: --settings-scroll;
-    animation-range: 0px 32px;
-  }
+/* ─── Шапка навигации боковой панели: чистая компоновка без темной тени при скролле ─── */
+.settings-side-panel__nav {
+  position: relative;
+  z-index: 2;
+  box-shadow: none !important;
 }
 
 .settings-section-block {
@@ -253,8 +243,9 @@
   position: relative;
   display: flow-root;
   min-width: 0;
-  padding-top: var(--space-6);
+  padding-top: 0;
 }
+.settings-section-block:last-child { margin-bottom: 0; }
 
 .settings-section-content > *:last-child,
 .settings-section-content > .modal__section > *:last-child {
@@ -353,8 +344,8 @@ body.settings-open .player-controls-wrapper--docked {
 }
 
 .settings-window-choice.visual-bar-card--active {
-  border-width: 1.5px !important;
-  box-shadow: 0 0 8px var(--surface-accent-glow), inset 0 0 0 1.5px transparent !important;
+  border-width: 1px !important;
+  box-shadow: inset 0 0 0 1.5px transparent !important;
 }
 
 .settings-window-choice__note {
@@ -403,7 +394,7 @@ body.settings-open .player-controls-wrapper--docked {
 
 @container settings-shell (max-width: 620px) {
   .settings-side-panel__scroll {
-    padding: var(--space-6) 14px 8px;
+    padding: var(--settings-section-padding) 14px;
   }
 
   .settings-side-panel__nav {

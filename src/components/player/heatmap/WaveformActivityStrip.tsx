@@ -17,6 +17,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from "react"
 import { invoke } from "@tauri-apps/api/core";
 import { usePlayerState, usePlayerProgress } from "../../../contexts/PlayerStateContext";
 import { useTranslation } from "../../../i18n/LanguageContext";
+import { createHeatmapDisplayCache } from "./heatmapDisplay";
 import { getVisualizerConfig } from "../AudioVisualizer";
 import {
   resolveHeatmapHoverMetrics,
@@ -161,6 +162,7 @@ export const WaveformActivityStrip: React.FC<WaveformActivityStripProps> = React
   // циклического перезапуска запросов анализа из-за миллисекундных тиков таймлайна и зависания на коротких сэмплах)
   const stableDurationHint =
     exactDuration > 0 ? Math.max(0.1, Math.round(exactDuration * 10) / 10) : 0;
+  const timelineDuration = exactDuration > 0 ? exactDuration : (heatmapResponse?.duration_sec || 0);
 
   // Сброс состояния наведения при выключении тепловой карты на лету или размонтировании
   useEffect(() => {
@@ -181,14 +183,21 @@ export const WaveformActivityStrip: React.FC<WaveformActivityStripProps> = React
   useEffect(() => {
     const handleSettingsChange = (e?: Event) => {
       const custom = e as CustomEvent<HeatmapConfig> | undefined;
-      if (custom?.detail) {
-        setHeatmapConfig(custom.detail);
-      } else {
-        setHeatmapConfig(getHeatmapConfig());
-      }
+      const nextConfig = custom?.detail || getHeatmapConfig();
+      setHeatmapConfig(nextConfig);
+      document.documentElement.style.setProperty(
+        "--heatmap-strip-height",
+        `${nextConfig.height || 34}px`
+      );
       const cfg = getVisualizerConfig();
       setIsVisualizerAbove(cfg.enabled && cfg.placement === "above_timeline");
     };
+
+    // Первичная синхронизация высоты в CSS-токен
+    document.documentElement.style.setProperty(
+      "--heatmap-strip-height",
+      `${heatmapConfig.height || 34}px`
+    );
 
     const handleCacheCleared = () => {
       setRetryCount((c) => c + 1);
@@ -202,7 +211,7 @@ export const WaveformActivityStrip: React.FC<WaveformActivityStripProps> = React
       window.removeEventListener("l-mpv-settings-changed", handleSettingsChange);
       window.removeEventListener("l-mpv-waveform-cache-cleared", handleCacheCleared);
     };
-  }, []);
+  }, [heatmapConfig.height]);
 
   // 2. Управляемая загрузка профиля данных с защитой от поздних ответов и гонок отмены
   useEffect(() => {
@@ -217,7 +226,7 @@ export const WaveformActivityStrip: React.FC<WaveformActivityStripProps> = React
       return;
     }
 
-    if (stableDurationHint <= 0) {
+    if (stableDurationHint <= 0 && heatmapConfig.dataSource === "audio") {
       // Хронометраж медиафайла еще не получен от плеера — ожидаем готовности
       setLoadingStatus("loading");
       return;
@@ -340,20 +349,26 @@ export const WaveformActivityStrip: React.FC<WaveformActivityStripProps> = React
     if (hoverRatio === null) return null;
     return resolveHeatmapHoverMetrics({
       hoverRatio,
-      duration: exactDuration,
+      duration: timelineDuration,
       response: heatmapResponse,
       samples,
       dataSource: heatmapConfig.dataSource,
       mediaInfo,
       isRussianLocale: isRussian,
     });
-  }, [hoverRatio, exactDuration, heatmapResponse, samples, heatmapConfig.dataSource, mediaInfo, isRussian]);
+  }, [hoverRatio, timelineDuration, heatmapResponse, samples, heatmapConfig.dataSource, mediaInfo, isRussian]);
 
   // Стабильные ссылки на текущие параметры для предотвращения пересоздания подписок
   const positionRef = useRef(position);
   positionRef.current = position;
-  const durationRef = useRef(exactDuration);
-  durationRef.current = exactDuration;
+  const durationRef = useRef(timelineDuration);
+  durationRef.current = timelineDuration;
+  const responseRef = useRef(heatmapResponse);
+  responseRef.current = heatmapResponse;
+  const [prepareDisplay] = useState(createHeatmapDisplayCache);
+  useEffect(() => {
+    if (!heatmapResponse) prepareDisplay(null, 0, 0);
+  }, [heatmapResponse, prepareDisplay]);
   const hoverRatioRef = useRef(hoverRatio);
   hoverRatioRef.current = hoverRatio;
   const samplesRef = useRef(samples);
@@ -378,10 +393,14 @@ export const WaveformActivityStrip: React.FC<WaveformActivityStripProps> = React
     }
 
     if (metricsRef.current) {
+      const response = responseRef.current;
+      const displaySamples = response
+        ? prepareDisplay(response, metricsRef.current.width, durationRef.current)
+        : currentSamples;
       renderWaveformToCanvas(
         ctx,
         metricsRef.current,
-        currentSamples,
+        displaySamples,
         positionRef.current,
         durationRef.current,
         hoverRatioRef.current,
@@ -460,7 +479,7 @@ export const WaveformActivityStrip: React.FC<WaveformActivityStripProps> = React
     if (isVisible) {
       scheduleRender();
     }
-  }, [position, exactDuration, hoverRatio, samples, isVisible, heatmapConfig, scheduleRender]);
+  }, [position, timelineDuration, hoverRatio, samples, isVisible, heatmapConfig, scheduleRender]);
 
   // 6. Интерактивные обработчики мыши
   const handlePointerEnter = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -482,12 +501,12 @@ export const WaveformActivityStrip: React.FC<WaveformActivityStripProps> = React
   }, [onHoverChange]);
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (exactDuration <= 0) return;
+    if (timelineDuration <= 0) return;
     const ratio = calcPointerRatio(e.clientX, containerRef.current);
     if (ratio !== null) {
-      seekTo(ratio * exactDuration);
+      seekTo(ratio * timelineDuration);
     }
-  }, [exactDuration, seekTo]);
+  }, [timelineDuration, seekTo]);
 
   const handleRetry = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();

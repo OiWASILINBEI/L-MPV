@@ -348,7 +348,7 @@ export function HotkeysSettingsTab({
   }, [onRecordingChange]);
 
   return (
-    <div className="modal__section">
+    <div className="modal__section settings-stack">
       <div
         style={{
           padding: "12px 16px",
@@ -358,11 +358,12 @@ export function HotkeysSettingsTab({
           color: "var(--accent-text)",
           fontSize: "var(--fs-base)",
           lineHeight: "1.4",
-          marginBottom: "var(--space-7)",
           fontWeight: 500,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "var(--settings-content-gap)",
         }}
         >
         <span>{dict.settings.hotkeys.helpText}</span>
@@ -374,7 +375,7 @@ export function HotkeysSettingsTab({
           style={{
             background: "rgba(255, 255, 255, 0.1)",
             border: "1px solid var(--border)",
-            color: "white",
+            color: "var(--text-primary)",
             borderRadius: "var(--radius-sm)",
             padding: "4px 8px",
             fontSize: "var(--fs-xs)",
@@ -391,12 +392,12 @@ export function HotkeysSettingsTab({
 
       <div
         className="modal__section-title"
-        style={{ fontSize: "var(--fs-md)", color: "var(--text-secondary)", fontWeight: 600, textTransform: "none", letterSpacing: "normal", marginBottom: "var(--space-5)" }}
+        style={{ fontSize: "var(--fs-md)", color: "var(--text-secondary)", fontWeight: 600, textTransform: "none", letterSpacing: "normal", marginBottom: 0 }}
         >
         {dict.settings.hotkeys.sectionTitle}
       </div>
 
-      <div className="col col-gap-4">
+      <div className="settings-stack">
         {Object.entries(CATEGORIZED_HOTKEYS).map(([category, items]) => {
           const secKey = `hk_${category}`;
           const isOpen = !!openSections[secKey];
@@ -454,6 +455,7 @@ export function HotkeysSettingsTab({
                               <div key={idx} style={{ display: "flex", alignItems: "center" }}>
                                 <button
                                   type="button"
+                                  className="hotkey-chip"
                                   data-hotkey-recorder={isRecording ? "" : undefined}
                                   onClick={(e) => {
                                     if (Date.now() < ignoreClickUntilRef.current) {
@@ -486,12 +488,12 @@ export function HotkeysSettingsTab({
                                     border: isConflicted
                                       ? "1.5px solid var(--danger-text)"
                                       : isRecording
-                                      ? "1.5px solid var(--accent)"
+                                      ? "1px solid var(--accent)"
                                       : "1px solid var(--border-subtle)",
                                     boxShadow: isConflicted
                                       ? "0 0 8px var(--danger-glow), inset 0 0 0 1px var(--danger-border)"
                                       : isRecording
-                                      ? "0 0 8px var(--surface-accent-glow), inset 0 0 0 1px transparent"
+                                      ? "none"
                                       : "none",
                                     borderRadius: "var(--radius-control)",
                                     fontFamily: "monospace",
@@ -553,8 +555,8 @@ export function HotkeysSettingsTab({
                                   style={{
                                     padding: "4px 10px",
                                     background: "var(--surface-accent-subtle)",
-                                    border: "1.5px solid var(--accent)",
-                                    boxShadow: "0 0 8px var(--surface-accent-glow), inset 0 0 0 1.5px transparent",
+                                    border: "1px solid var(--accent)",
+                                    boxShadow: "none",
                                     borderRadius: "var(--radius-control)",
                                     fontFamily: "monospace",
                                     fontSize: "var(--fs-sm)",

@@ -5,6 +5,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save } from "@tauri-apps/plugin-dialog";
 import { getDict, getEffectiveLocale } from "../i18n";
 import { showOsd } from "../hooks/useOsd";
+import { playbackPollDelay } from "../utils/playbackPolling";
 
 export interface PlaylistItem {
   index: number;
@@ -210,6 +211,8 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
   const [seekTarget, setSeekTarget] = useState<number | null>(null);
   const [tracks, setTracks] = useState<TrackInfo[]>([]);
   const tracksRef = useRef<TrackInfo[]>([]);
+  const tracksMediaPathRef = useRef<string>("");
+  const tracksLoadSeqRef = useRef<number>(0);
   const seekingRef = useRef(false);
   const seekTargetRef = useRef<number | null>(null);
   const seekTimestampRef = useRef<number>(0);
@@ -223,10 +226,19 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
   const mediaInfoRef = useRef<MediaInfo | null>(null);
 
   const loadTracks = useCallback(async () => {
+    const reqSeq = ++tracksLoadSeqRef.current;
+    const expectedPath = currentPathRef.current;
     try {
       const t = await invoke<TrackInfo[]>("get_tracks");
+      if (
+        reqSeq !== tracksLoadSeqRef.current ||
+        expectedPath !== currentPathRef.current
+      ) {
+        return;
+      }
       const prev = tracksRef.current;
       const isSame =
+        tracksMediaPathRef.current === expectedPath &&
         prev.length === t.length &&
         prev.every(
           (p, i) =>
@@ -234,9 +246,14 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
             p.selected === t[i].selected &&
             p.type === t[i].type &&
             p.title === t[i].title &&
-            p.lang === t[i].lang
+            p.lang === t[i].lang &&
+            p.codec === t[i].codec &&
+            Boolean(p.external) === Boolean(t[i].external) &&
+            (p.external_filename ?? "") === (t[i].external_filename ?? "") &&
+            (p.ff_index ?? null) === (t[i].ff_index ?? null)
         );
       if (!isSame) {
+        tracksMediaPathRef.current = expectedPath;
         tracksRef.current = t;
         setTracks(t);
       }
@@ -293,6 +310,8 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
   // При появлении медиа (hasMedia === true) первичный опрос дорожек и плейлиста уже выполняется внутри fetchState.
   useEffect(() => {
     if (!hasMedia) {
+      tracksLoadSeqRef.current += 1;
+      tracksMediaPathRef.current = "";
       tracksRef.current = [];
       setTracks([]);
       setPlaylist([]);
@@ -325,12 +344,15 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
 
     idleTimer.current = window.setTimeout(() => {
       const currentUIOpen = !!document.querySelector(
-        ".track-popover, .controls-overflow, .modal, .context-menu, .playlist-drawer, .media-info-overlay, .chapters-modal-overlay, .subtitles-modal-overlay"
+        ".track-popover, .controls-overflow, .modal, .settings-side-panel, .context-menu, .playlist-drawer, .media-info-overlay, .chapters-modal-overlay, .subtitles-modal-overlay"
       );
       const isDragging = !!document.querySelector(".timeline--dragging");
       if (!currentUIOpen && !isDragging) {
         isIdleRef.current = true;
         setIsIdle(true);
+      } else {
+        // The overlay may close after this callback. Keep a pending check alive.
+        window.dispatchEvent(new Event("l-mpv-idle-recheck"));
       }
     }, 3000);
   }, []);
@@ -341,12 +363,14 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
 
       idleTimer.current = window.setTimeout(() => {
         const currentUIOpen = !!document.querySelector(
-          ".track-popover, .controls-overflow, .modal, .context-menu, .playlist-drawer, .media-info-overlay, .chapters-modal-overlay, .subtitles-modal-overlay"
+          ".track-popover, .controls-overflow, .modal, .settings-side-panel, .context-menu, .playlist-drawer, .media-info-overlay, .chapters-modal-overlay, .subtitles-modal-overlay"
         );
         const isDragging = !!document.querySelector(".timeline--dragging");
         if (!currentUIOpen && !isDragging) {
           isIdleRef.current = true;
           setIsIdle(true);
+        } else {
+          startIdleTimer(300);
         }
       }, delayMs);
     };
@@ -363,12 +387,12 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
 
       // Проверяем, открыты ли какие-либо модальные окна или всплывающие меню
       const isAnyUIOpen = !!document.querySelector(
-        ".track-popover, .controls-overflow, .modal, .context-menu, .playlist-drawer, .media-info-overlay, .chapters-modal-overlay, .subtitles-modal-overlay"
+        ".track-popover, .controls-overflow, .modal, .settings-side-panel, .context-menu, .playlist-drawer, .media-info-overlay, .chapters-modal-overlay, .subtitles-modal-overlay"
       );
 
-      // Если открыты меню или модалки, не запускаем таймер скрытия
+      // Продолжаем проверять после закрытия оверлея, даже без движения мыши.
       if (isAnyUIOpen) {
-        if (idleTimer.current) window.clearTimeout(idleTimer.current);
+        startIdleTimer(3000);
         return;
       }
 
@@ -387,25 +411,29 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
     };
 
     const handleMouseLeave = () => {
-      const isAnyUIOpen = !!document.querySelector(
-        ".track-popover, .controls-overflow, .modal, .context-menu, .playlist-drawer, .media-info-overlay, .chapters-modal-overlay, .subtitles-modal-overlay"
-      );
-      if (!isAnyUIOpen) {
-        // При уходе мыши за пределы окна в оконном режиме гасим контролы через 1.2 сек
-        startIdleTimer(1200);
-      }
+      startIdleTimer(1200);
     };
+
+    const handleRecheck = () => startIdleTimer(300);
 
     window.addEventListener("mousemove", handleActivity);
     window.addEventListener("mousedown", handleActivity);
     window.addEventListener("wheel", handleActivity);
     document.addEventListener("mouseleave", handleMouseLeave);
+    window.addEventListener("blur", handleMouseLeave);
+    window.addEventListener("l-mpv-idle-recheck", handleRecheck);
+    const unlistenFocus = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      if (!focused) handleMouseLeave();
+    }).catch(() => () => {});
 
     return () => {
       window.removeEventListener("mousemove", handleActivity);
       window.removeEventListener("mousedown", handleActivity);
       window.removeEventListener("wheel", handleActivity);
       document.removeEventListener("mouseleave", handleMouseLeave);
+      window.removeEventListener("blur", handleMouseLeave);
+      window.removeEventListener("l-mpv-idle-recheck", handleRecheck);
+      void unlistenFocus.then(unlisten => unlisten());
       if (idleTimer.current) window.clearTimeout(idleTimer.current);
     };
   }, []);
@@ -453,11 +481,7 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       try {
         const dynState = await invoke<PlaybackState>("get_playback_state");
         if (isCancelled) return;
-        if (dynState.paused) {
-          nextDelay = 1000;
-        } else if (dynState.path === "") {
-          nextDelay = hasMediaInfoRef.current ? 1000 : 150;
-        }
+        nextDelay = playbackPollDelay(dynState, hasMediaInfoRef.current);
         
         if (!hasMediaInfoRef.current || dynState.path !== currentPathRef.current) {
           const fullInfo = await invoke<MediaInfo>("get_media_info");
@@ -468,7 +492,14 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
               : (dynState.duration> 0 ? dynState.duration : 0);
             fullInfo.duration = effectiveDuration;
 
+            const pathChanged = currentPathRef.current !== fullInfo.path;
             currentPathRef.current = fullInfo.path;
+            if (pathChanged || tracksMediaPathRef.current !== fullInfo.path) {
+              tracksLoadSeqRef.current += 1;
+              tracksMediaPathRef.current = fullInfo.path;
+              tracksRef.current = [];
+              setTracks([]);
+            }
             currentAidRef.current = "";
             currentSidRef.current = "";
             currentVidRef.current = "";
@@ -506,7 +537,6 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
             if (isCancelled) return;
             setChapters(chaps);
             refreshPlaylist();
-            if (fullInfo.paused) nextDelay = 1000;
 
             // Resume выполняет бэкенд (mpv `start` в open_file/playlist_next/prev/play_index):
             // второй seek здесь приводил к повторной буферизации. Локально лишь
@@ -526,6 +556,10 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
             currentPositionRef.current = 0;
             hasMediaInfoRef.current = false;
             mediaInfoRef.current = null;
+            tracksLoadSeqRef.current += 1;
+            tracksMediaPathRef.current = "";
+            tracksRef.current = [];
+            setTracks([]);
             setMediaInfo(null);
             setHasMedia(false);
             setChapters([]);
@@ -989,11 +1023,14 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       });
       await invoke("set_audio_track", { trackId });
       const t = tracksRef.current.find(x => x.type === "audio" && x.id === trackId);
+      const curLoc = getEffectiveLocale();
       if (t) {
-        const curLoc = getEffectiveLocale();
         const prefix = curLoc === "en" ? "Audio: " : curLoc === "zh" ? "音轨: " : "Аудио: ";
         const fallback = curLoc === "en" ? `Track ${t.id}` : curLoc === "zh" ? `轨道 ${t.id}` : `Дорожка ${t.id}`;
         invoke("show_osd", { text: `${prefix}${t.title || t.lang || fallback}` }).catch(() => {});
+      } else if (trackId <= 0) {
+        const offText = curLoc === "en" ? "Audio: Off" : curLoc === "zh" ? "音轨: 关" : "Аудио: Выкл";
+        invoke("show_osd", { text: offText }).catch(() => {});
       }
       await loadTracks();
     } catch (e) {
@@ -1182,26 +1219,31 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const trackKey = `${track.type}-${track.id}`;
+    const currentTracks =
+      tracksMediaPathRef.current === mediaInfo.path ? tracksRef.current : tracks;
+    const resolvedTrack =
+      currentTracks.find((t) => t.type === track.type && t.id === track.id) || track;
+
+    const trackKey = `${resolvedTrack.type}-${resolvedTrack.id}`;
     setDownloadingTrackKey(trackKey);
 
     try {
-      const ext = getExtensionForTrack(track);
+      const ext = getExtensionForTrack(resolvedTrack);
 
       // Формируем имя файла из названия дорожки с очисткой от недопустимых символов Windows
-      let cleanTrackName = (track.title || "")
+      let cleanTrackName = (resolvedTrack.title || "")
         .trim()
         .replace(/[\x00-\x1f\\/:*?"<>|]/g, "_")
         .trim();
       if (!cleanTrackName) {
         const typeLabel = curLocale === "en"
-          ? (track.type === "audio" ? "Audio" : "Subtitles")
+          ? (resolvedTrack.type === "audio" ? "Audio" : "Subtitles")
           : curLocale === "zh"
-          ? (track.type === "audio" ? "音轨" : "字幕")
-          : (track.type === "audio" ? "Аудио" : "Субтитры");
-        cleanTrackName = track.lang
-          ? `${typeLabel}_${track.lang.toUpperCase()}`
-          : `${typeLabel}_${track.id}`;
+          ? (resolvedTrack.type === "audio" ? "音轨" : "字幕")
+          : (resolvedTrack.type === "audio" ? "Аудио" : "Субтитры");
+        cleanTrackName = resolvedTrack.lang
+          ? `${typeLabel}_${resolvedTrack.lang.toUpperCase()}`
+          : `${typeLabel}_${resolvedTrack.id}`;
       }
 
       // Итоговое имя файла совпадает с названием дорожки
@@ -1228,15 +1270,15 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
         finalTargetPath = `${videoDir}/${defaultFileName}`;
       } else {
         const dialogTitle = curLocale === "en"
-          ? `Save ${track.type === "audio" ? "audio track" : "subtitles"}`
+          ? `Save ${resolvedTrack.type === "audio" ? "audio track" : "subtitles"}`
           : curLocale === "zh"
-          ? `保存${track.type === "audio" ? "音轨" : "字幕"}`
-          : `Сохранить ${track.type === "audio" ? "аудиодорожку" : "субтитры"}`;
+          ? `保存${resolvedTrack.type === "audio" ? "音轨" : "字幕"}`
+          : `Сохранить ${resolvedTrack.type === "audio" ? "аудиодорожку" : "субтитры"}`;
         const filterName = curLocale === "en"
-          ? (track.type === "audio" ? "Audio file" : "Subtitles")
+          ? (resolvedTrack.type === "audio" ? "Audio file" : "Subtitles")
           : curLocale === "zh"
-          ? (track.type === "audio" ? "音频文件" : "字幕")
-          : (track.type === "audio" ? "Аудиофайл" : "Субтитры");
+          ? (resolvedTrack.type === "audio" ? "音频文件" : "字幕")
+          : (resolvedTrack.type === "audio" ? "Аудиофайл" : "Субтитры");
 
         finalTargetPath = await save({
           title: dialogTitle,
@@ -1256,24 +1298,26 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const typeTracks = tracks.filter((t) => t.type === track.type && !t.external);
-      const trackIdx = typeTracks.findIndex((t) => t.id === track.id);
-      const streamIndex = trackIdx>= 0 ? trackIdx : Math.max(0, track.id - 1);
+      const typeTracks = currentTracks.filter(
+        (t) => t.type === resolvedTrack.type && !t.external
+      );
+      const trackIdx = typeTracks.findIndex((t) => t.id === resolvedTrack.id);
+      const streamIndex = trackIdx >= 0 ? trackIdx : Math.max(0, resolvedTrack.id - 1);
 
       await invoke<string>("extract_track", {
         videoPath: videoFullPath,
-        trackType: track.type,
+        trackType: resolvedTrack.type,
         trackIndex: streamIndex,
-        ffIndex: track.ff_index !== undefined ? track.ff_index : null,
-        externalFilename: track.external_filename || null,
+        ffIndex: resolvedTrack.ff_index !== undefined ? resolvedTrack.ff_index : null,
+        externalFilename: resolvedTrack.external_filename || null,
         targetPath: finalTargetPath,
       });
 
       const successLabel = curLocale === "en"
-        ? (track.type === "audio" ? "Audio track saved" : "Subtitles saved")
+        ? (resolvedTrack.type === "audio" ? "Audio track saved" : "Subtitles saved")
         : curLocale === "zh"
-        ? (track.type === "audio" ? "音轨已保存" : "字幕已保存")
-        : (track.type === "audio" ? "Аудиодорожка сохранена" : "Субтитры сохранены");
+        ? (resolvedTrack.type === "audio" ? "音轨已保存" : "字幕已保存")
+        : (resolvedTrack.type === "audio" ? "Аудиодорожка сохранена" : "Субтитры сохранены");
       window.dispatchEvent(
         new CustomEvent("show-osd", {
           detail: `${successLabel}: ${cleanTrackName}.${ext}`,

@@ -10,8 +10,8 @@ import { AccordionSection } from "../components/AccordionSection";
 import { ColorSchemeSection } from "../components/ColorSchemeSection";
 import { VisualizerSettingsSection } from "../sections/VisualizerSettingsSection";
 import { HeatmapSettingsSection } from "../sections/HeatmapSettingsSection";
-import { ControlButtonsPreviewCard } from "../components/ControlButtonsPreviewCard";
-import { optionCardStyle, optionResetBtnStyle, optionBtnStyle } from "../components/optionCardStyles";
+import { ControlButtonsSettings } from "../components/ControlButtonsSettings";
+import { optionCardStyle, optionResetBtnStyle, optionBtnStyle, optionBtnClassName } from "../components/optionCardStyles";
 import { VerticalSlider } from "../appearance/ambientPrimitives";
 import {
   UiRadiusLevel,
@@ -147,7 +147,7 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
 
   return (
     <>
-                  <div className="modal__section col col-gap-4">
+                  <div className="modal__section settings-stack">
               {/* 1. Цветовое оформление (Единая категория: цвет плеера, акценты, свечение) */}
               <AccordionSection
                 isOpen={!!openSections["app_color_scheme"]}
@@ -165,9 +165,7 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
                 icon={<SlidersHorizontal size={18} />}
                 title={dict.settings.appearance.interfaceSection}
                 >
-                <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)", marginBottom: "var(--space-6)", lineHeight: 1.35 }}>
-                  {dict.settings.appearance.interfaceDesc}
-                </div>
+
 
                 {/* ── Вспомогательные стили для подблоков настроек интерфейса ── */}
                 {(() => {
@@ -375,6 +373,7 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
                                       <button
                                         key={level}
                                         type="button"
+                                        className={optionBtnClassName(isSel)}
                                         onClick={() => {
                                           setUiRadius({ level, value: preset.controlsRadius });
                                           saveUiRadius(level, preset.controlsRadius);
@@ -389,14 +388,14 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
                                           style={{
                                             width: 46,
                                             height: 25,
-                                            border: `1.5px solid ${isSel ? "var(--accent)" : "var(--border-hover)"}`,
+                                            border: `1.5px solid ${isSel ? "var(--selection-frame)" : "var(--border-hover)"}`,
                                             borderRadius: visualRadius,
                                             background: isSel ? "rgba(var(--accent-rgb, 127, 199, 255), 0.18)" : "rgba(255, 255, 255, 0.04)",
                                             display: "flex",
                                             alignItems: "center",
                                             justifyContent: "center",
-                                            boxShadow: isSel ? "0 0 10px var(--surface-accent-glow)" : "none",
-                                            transition: "all var(--t-fast) var(--ease-smooth)",
+                                            boxShadow: isSel ? "var(--selection-shadow)" : "none",
+                                            transition: "background-color var(--t-fast) var(--ease-smooth), border-color var(--t-fast) var(--ease-smooth), color var(--t-fast) var(--ease-smooth), box-shadow var(--t-fast) var(--ease-smooth)",
                                             flexShrink: 0,
                                           }}
                                           >
@@ -406,7 +405,7 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
                                               height: 3,
                                               borderRadius: visualRadius === "1.5px" ? "1px" : "999px",
                                               background: isSel ? "var(--accent)" : "rgba(255, 255, 255, 0.25)",
-                                              transition: "all var(--t-fast) var(--ease-smooth)",
+                                              transition: "background-color var(--t-fast) var(--ease-smooth), border-color var(--t-fast) var(--ease-smooth), color var(--t-fast) var(--ease-smooth), box-shadow var(--t-fast) var(--ease-smooth)",
                                             }}
                                           />
                                         </div>
@@ -462,7 +461,7 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
                                     background: uiScale.mode === "auto" ? "var(--accent)" : "rgba(255,255,255,0.08)",
                                     color: uiScale.mode === "auto" ? "var(--on-accent)" : "var(--text-secondary)",
                                     border: "none",
-                                    borderRadius: "4px",
+                                    borderRadius: "var(--radius-xs)",
                                     width: 18,
                                     height: 18,
                                     display: "flex",
@@ -471,7 +470,7 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
                                     fontSize: "var(--fs-2xs)",
                                     fontWeight: "bold",
                                     cursor: "pointer",
-                                    transition: "all var(--t-fast) var(--ease-smooth)",
+                                    transition: "background-color var(--t-fast) var(--ease-smooth), border-color var(--t-fast) var(--ease-smooth), color var(--t-fast) var(--ease-smooth), box-shadow var(--t-fast) var(--ease-smooth)",
                                   }}
 
                                   >
@@ -499,6 +498,7 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
                                     <button
                                       key={preset.id}
                                       type="button"
+                                      className={optionBtnClassName(isSel)}
                                       onClick={() => {
                                         const nextVal = preset.value !== null ? preset.value : 1.0;
                                         setUiScale({ mode: preset.id, value: nextVal });
@@ -582,7 +582,7 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
                                 return (
                                   <button
                                     key={fontPreset.id}
-                                    className="ui-font-choice"
+                                    className={`ui-font-choice${isSel ? " ui-font-choice--active" : ""}`}
                                     type="button"
                                     onClick={() => {
                                       setUiFont(fontPreset.id);
@@ -594,15 +594,15 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
                                       justifyContent: "space-between",
                                       padding: "6px 8px",
                                       borderRadius: "var(--radius-control)",
-                                      border: isSel ? "1.5px solid var(--accent)" : "1px solid rgba(255, 255, 255, 0.06)",
+                            border: isSel ? "1px solid var(--selection-frame)" : "1px solid rgba(255, 255, 255, 0.06)",
                                       background: isSel ? "rgba(var(--accent-rgb, 127, 199, 255), 0.16)" : "rgba(255, 255, 255, 0.03)",
                                       color: isSel ? "var(--text-primary)" : "var(--text-secondary)",
                                       boxShadow: isSel
-                                        ? "0 0 8px var(--surface-accent-glow), inset 0 0 0 1.5px transparent"
+                                        ? "var(--selection-shadow)"
                                         : "none",
                                       cursor: "pointer",
                                       fontFamily: `var(--font-${fontPreset.id})`,
-                                      transition: "all var(--t-fast) var(--ease-smooth)",
+                                      transition: "background-color var(--t-fast) var(--ease-smooth), border-color var(--t-fast) var(--ease-smooth), color var(--t-fast) var(--ease-smooth), box-shadow var(--t-fast) var(--ease-smooth)",
                                       flexShrink: 0,
                                     }}
                                     >
@@ -626,7 +626,7 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
                                     return (
                                     <button
                                       key={font.id}
-                                      className="ui-font-choice"
+                                      className={`ui-font-choice${isSel ? " ui-font-choice--active" : ""}`}
                                         type="button"
                                         onClick={() => {
                                           setUiFont(font.id);
@@ -638,15 +638,15 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
                                           justifyContent: "space-between",
                                           padding: "6px 8px",
                                           borderRadius: "var(--radius-control)",
-                                          border: isSel ? "1.5px solid var(--accent)" : "1px solid rgba(255, 255, 255, 0.06)",
+                                      border: isSel ? "1px solid var(--selection-frame)" : "1px solid rgba(255, 255, 255, 0.06)",
                                           background: isSel ? "rgba(var(--accent-rgb, 127, 199, 255), 0.16)" : "rgba(255, 255, 255, 0.03)",
                                           color: isSel ? "var(--text-primary)" : "var(--text-secondary)",
                                           boxShadow: isSel
-                                            ? "0 0 8px var(--surface-accent-glow), inset 0 0 0 1.5px transparent"
+                                            ? "var(--selection-shadow)"
                                             : "none",
                                           cursor: "pointer",
                                           fontFamily: `'${font.family}', sans-serif`,
-                                          transition: "all var(--t-fast) var(--ease-smooth)",
+                                          transition: "background-color var(--t-fast) var(--ease-smooth), border-color var(--t-fast) var(--ease-smooth), color var(--t-fast) var(--ease-smooth), box-shadow var(--t-fast) var(--ease-smooth)",
                                           flexShrink: 0,
                                         }}
                                         >
@@ -997,7 +997,7 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
                             {dict.settings.appearance.animationsDesc1}
                           </span>
                         </div>
-                        <span className="text-xs text-muted" style={{ lineHeight: 1.45 }}>
+                        <span className="t-label-xs" style={{ fontWeight: 400, lineHeight: 1.45 }}>
                           {dict.settings.appearance.animationsDesc2}
                         </span>
                       </div>
@@ -1025,179 +1025,28 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
                 icon={<Eye size={18} />}
                 title={dict.settings.appearance.visibilitySection}
                 >
-                <div>
-                  <ControlButtonsPreviewCard
-                    visibleButtons={visibleButtons}
-                    skipOpeningSeconds={skipOpeningSeconds}
-                    seekStepSeconds={seekStepSeconds}
-                  />
-                </div>
-
-                {/* Единая аккуратная адаптивная сетка кнопок управления */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", columnGap: "var(--space-7)", rowGap: "var(--space-5)", marginTop: "var(--space-6)" }}>
-                  {[
-                    { id: 'seekButtons', label: dict.settings.appearance.visSeekButtons, defaultChecked: true },
-                    { id: 'repeat', label: dict.settings.appearance.visRepeat, defaultChecked: true },
-                    { id: 'shuffle', label: dict.settings.appearance.visShuffle, defaultChecked: true },
-                    { id: 'alwaysOnTop', label: dict.settings.appearance.visAlwaysOnTop, defaultChecked: true },
-                    { id: 'info', label: dict.settings.appearance.visFileInfo, defaultChecked: true },
-                    { id: 'mediaInfo', label: dict.settings.appearance.visMediaInfo, defaultChecked: true },
-                    { id: 'visualizer', label: dict.settings.appearance.visVisualizer, defaultChecked: true },
-                    { id: 'screenshot', label: dict.settings.appearance.visScreenshot, defaultChecked: true },
-                    { id: 'playlist', label: dict.settings.appearance.visPlaylist, defaultChecked: true },
-                    { id: 'fullscreen', label: dict.settings.appearance.visFullscreen, defaultChecked: true },
-                    { id: 'skipOpening', label: dict.settings.appearance.visSkipOpening, defaultChecked: false },
-                    { id: 'speed', label: dict.settings.appearance.visSpeed, defaultChecked: false }
-                  ].map(btn => {
-                    const isChecked = visibleButtons[btn.id] !== undefined 
-                      ? visibleButtons[btn.id]
-                      : btn.defaultChecked;
-                    return (
-                      <label
-                        key={btn.id}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "var(--space-4)",
-                          minHeight: 24,
-                          height: "auto",
-                          minWidth: 0,
-                          cursor: "pointer",
-                          userSelect: "none",
-                          boxSizing: "border-box",
-                        }}
-                        >
-                        <input
-                          type="checkbox"
-                          className="ui-checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            const val = e.target.checked;
-                            const updated = { ...visibleButtons, [btn.id]: val };
-                            setVisibleButtons(updated);
-                            localStorage.setItem('l-mpv-visible-buttons', JSON.stringify(updated));
-                            window.dispatchEvent(new Event('l-mpv-settings-changed'));
-                          }}
-                        />
-                        <span style={{ fontSize: "var(--fs-base)", color: "var(--text-primary)", fontWeight: 500, lineHeight: 1.2, minWidth: 0, whiteSpace: "nowrap" }}>
-                          {btn.label}
-                        </span>
-                        {btn.id === 'seekButtons' && (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "var(--space-2)",
-                              marginLeft: "var(--space-1)",
-                              height: 20,
-                              flexShrink: 0,
-                              whiteSpace: "nowrap",
-                              opacity: isChecked ? 1 : 0.4,
-                              transition: "opacity var(--t-fast) var(--ease-smooth)",
-                            }}
-                            >
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              className="no-spin-input"
-                              value={seekStepSeconds}
-                              disabled={!isChecked}
-                              onChange={(e) => {
-                                const rawVal = e.target.value.replace(/\D/g, "");
-                                const num = rawVal === "" ? 0 : Number(rawVal);
-                                const val = num> 300 ? 300 : num;
-                                setSeekStepSeconds(val);
-                                if (val> 0) saveSeekStepSeconds(val);
-                              }}
-                              onBlur={() => {
-                                if (seekStepSeconds <= 0) {
-                                  setSeekStepSeconds(10);
-                                  saveSeekStepSeconds(10);
-                                }
-                              }}
-                              style={{
-                                width: 38,
-                                height: 20,
-                                padding: "0 2px",
-                                background: "rgba(0, 0, 0, 0.4)",
-                                border: "1px solid var(--border)",
-                                borderRadius: "var(--radius-sm)",
-                                color: "var(--text-primary)",
-                                fontSize: "var(--fs-xs)",
-                                textAlign: "center",
-                                fontWeight: 600,
-                                boxSizing: "border-box",
-                                outline: "none",
-                              }}
-                            />
-                            <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", lineHeight: 1, whiteSpace: "nowrap" }}>
-                              {dict.settings.appearance.secSuffix}
-                            </span>
-                          </div>
-                        )}
-                        {btn.id === 'skipOpening' && (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "var(--space-2)",
-                              marginLeft: "var(--space-1)",
-                              height: 20,
-                              flexShrink: 0,
-                              whiteSpace: "nowrap",
-                              opacity: isChecked ? 1 : 0.4,
-                              transition: "opacity var(--t-fast) var(--ease-smooth)",
-                            }}
-                            >
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              className="no-spin-input"
-                              value={skipOpeningSeconds}
-                              disabled={!isChecked}
-                              onChange={(e) => {
-                                const rawVal = e.target.value.replace(/\D/g, "");
-                                const num = rawVal === "" ? 0 : Number(rawVal);
-                                const val = num> 600 ? 600 : num;
-                                setSkipOpeningSeconds(val);
-                                if (val> 0) {
-                                  localStorage.setItem('l-mpv-skip-opening-seconds', val.toString());
-                                  window.dispatchEvent(new Event('l-mpv-settings-changed'));
-                                }
-                              }}
-                              onBlur={() => {
-                                if (skipOpeningSeconds <= 0) {
-                                  setSkipOpeningSeconds(90);
-                                  localStorage.setItem('l-mpv-skip-opening-seconds', '90');
-                                  window.dispatchEvent(new Event('l-mpv-settings-changed'));
-                                }
-                              }}
-                              style={{
-                                width: 38,
-                                height: 20,
-                                padding: "0 2px",
-                                background: "rgba(0, 0, 0, 0.4)",
-                                border: "1px solid var(--border)",
-                                borderRadius: "var(--radius-sm)",
-                                color: "var(--text-primary)",
-                                fontSize: "var(--fs-xs)",
-                                textAlign: "center",
-                                fontWeight: 600,
-                                boxSizing: "border-box",
-                                outline: "none",
-                              }}
-                            />
-                            <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", lineHeight: 1, whiteSpace: "nowrap" }}>
-                              {dict.settings.appearance.secSuffix}
-                            </span>
-                          </div>
-                        )}
-                      </label>
-                    );
-                  })}
-                </div>
+                <ControlButtonsSettings
+                  visibleButtons={visibleButtons}
+                  onVisibilityChange={(id, enabled) => {
+                    const updated = { ...visibleButtons, [id]: enabled };
+                    setVisibleButtons(updated);
+                    localStorage.setItem("l-mpv-visible-buttons", JSON.stringify(updated));
+                    window.dispatchEvent(new Event("l-mpv-settings-changed"));
+                  }}
+                  seekStepSeconds={seekStepSeconds}
+                  onSeekStepChange={value => {
+                    setSeekStepSeconds(value);
+                    if (value > 0) saveSeekStepSeconds(value);
+                  }}
+                  skipOpeningSeconds={skipOpeningSeconds}
+                  onSkipOpeningChange={value => {
+                    setSkipOpeningSeconds(value);
+                    if (value > 0) {
+                      localStorage.setItem("l-mpv-skip-opening-seconds", String(value));
+                      window.dispatchEvent(new Event("l-mpv-settings-changed"));
+                    }
+                  }}
+                />
               </AccordionSection>
 
               {/* 6. Размытие черных полос (Blur) */}
@@ -1227,11 +1076,12 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
                     ].map((item) => {
                       const isSel = ambientSettings.mode === item.id;
                       return (
-                        <button
-                          key={item.id}
-                          onClick={() => updateAmbient({ mode: item.id as AmbientMode }, true)}
-                          type="button"
-                          aria-pressed={isSel}
+                          <button
+                            key={item.id}
+                            onClick={() => updateAmbient({ mode: item.id as AmbientMode }, true)}
+                            type="button"
+                            aria-pressed={isSel}
+                            className={`ambient-choice${isSel ? " ambient-choice--active" : ""}`}
                           style={{
                             display: "flex",
                             flexDirection: "column",
@@ -1240,12 +1090,12 @@ export function AppearanceSettingsTab(props: AppearanceSettingsTabProps) {
                             gap: "var(--space-1)",
                             padding: "10px 6px",
                             borderRadius: "var(--segment-inner-radius)",
-                            border: isSel ? "1.5px solid var(--accent)" : "1px solid rgba(255, 255, 255, 0.06)",
+                            border: isSel ? "1px solid var(--selection-frame)" : "1px solid rgba(255, 255, 255, 0.06)",
                             cursor: "pointer",
                             background: isSel ? "rgba(var(--accent-rgb, 127, 199, 255), 0.16)" : "transparent",
                             color: isSel ? "var(--text-primary)" : "var(--text-secondary)",
                             boxShadow: isSel
-                              ? "0 0 8px var(--surface-accent-glow), inset 0 0 0 1.5px transparent"
+                              ? "var(--selection-shadow)"
                               : "none",
                             transition: "background-color var(--t-fast) var(--ease-smooth), border-color var(--t-fast) var(--ease-smooth), color var(--t-fast) var(--ease-smooth), box-shadow var(--t-fast) var(--ease-smooth)",
                           }}

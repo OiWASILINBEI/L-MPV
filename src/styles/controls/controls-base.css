@@ -86,7 +86,7 @@
   pointer-events: auto;
   background: var(--bg-pill);
   border: 1px solid var(--border-pill);
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   padding: var(--space-1) 11px;
   font-size: var(--fs-xs);
   font-weight: 600;
@@ -103,7 +103,7 @@
 
 .time-display--floating-center:hover {
   background: var(--bg-elevated);
-  border-color: var(--accent);
+  border-color: var(--border-pill-hover);
   color: #ffffff;
   box-shadow: var(--shadow-card-hover);
   transform: translateY(-1px);
@@ -444,28 +444,10 @@ html.no-animations .timeline__pulse {
   flex-shrink: 0;
   filter: none;
   transform-origin: center center;
-  animation: playPausePop var(--t-spring) var(--ease-spring-smooth);
+  /* Keep both states on the same centre; the button handles press feedback. */
+  transform: none;
   transition: color var(--t-fast) var(--ease-smooth),
               filter var(--t-fast) var(--ease-smooth);
-}
-
-.control-btn--play svg.lucide-play {
-  transform: translateX(1px);
-}
-
-@keyframes playPausePop {
-  0% {
-    opacity: 0.5;
-    transform: scale(0.92);
-  }
-  60% {
-    opacity: 1;
-    transform: scale(1.04);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 .control-btn--play:hover {
@@ -962,27 +944,47 @@ html[data-glow="off"] .timeline__thumb {
 }
 
 /* 1. Режим: «Над панелью» (above_controls) — парящий HUD строго по ширине таймлайна над пилюлей */
+.player-controls-wrapper {
+  --heatmap-controls-gap: 2px;
+  --heatmap-timeline-gap: 2px;
+  --heatmap-panel-inset: calc(var(--space-2) + 1px);
+  --heatmap-visualizer-offset: 0px;
+}
+
+.player-controls-wrapper--docked {
+  --heatmap-controls-gap: 4px;
+  --heatmap-panel-inset: 9px;
+}
+
+.player-controls-wrapper--capsule {
+  --heatmap-controls-gap: 3px;
+  --heatmap-timeline-gap: 3px;
+  --heatmap-panel-inset: 6px;
+}
+
+.player-controls--has-visualizer-above {
+  --heatmap-visualizer-offset: calc(var(--visualizer-height, 22px) + var(--space-1));
+}
+
 .waveform-activity-strip--above-controls {
   position: absolute;
   left: 0;
   right: 0;
   width: 100%;
-  bottom: calc(100% + 10px);
+  bottom: calc(100% + var(--heatmap-panel-inset) + var(--heatmap-controls-gap) + var(--heatmap-visualizer-offset));
   z-index: 15;
   overflow: visible;
 }
 
-/* Адаптация вертикального положения при наличии аудио-визуализатора над таймлайном */
-.waveform-activity-strip--above-controls.waveform-activity-strip--above-visualizer,
-.player-controls--has-visualizer-above .waveform-activity-strip--above-controls {
-  bottom: calc(100% + var(--visualizer-height, 22px) + 10px);
+.waveform-activity-strip--above-controls.waveform-activity-strip--above-visualizer {
+  --heatmap-visualizer-offset: calc(var(--visualizer-height, 22px) + var(--space-1));
 }
 
 /* 2. Режим: «Над таймлайном» (above_timeline) — внутри панели прямо над таймлайном */
 .waveform-activity-strip--above-timeline {
   position: relative;
   width: 100%;
-  margin-bottom: 4px;
+  margin-bottom: var(--heatmap-timeline-gap);
   border-radius: var(--radius-sm, 6px);
   overflow: visible;
   z-index: 10;
@@ -1001,7 +1003,18 @@ html[data-glow="off"] .timeline__thumb {
   pointer-events: none;
 }
 
-/* Парящий информационный бейдж над тепловой картой при наведении (стиль timeline-preview-card) */
+/* Preview is anchored to the timeline; floating time is anchored to its panel. */
+.player-controls:has(.waveform-activity-strip--above-controls.waveform-activity-strip--visible) .timeline-preview-card {
+  bottom: calc(100% + var(--heatmap-strip-height, 34px) + var(--heatmap-panel-inset) + var(--heatmap-controls-gap) + var(--heatmap-visualizer-offset) + 8px);
+}
+.player-controls:has(.waveform-activity-strip--above-timeline.waveform-activity-strip--visible) .timeline-preview-card {
+  bottom: calc(100% + var(--heatmap-strip-height, 34px) + var(--heatmap-timeline-gap) + var(--heatmap-visualizer-offset) + 8px);
+}
+.player-controls:has(.waveform-activity-strip--above-controls.waveform-activity-strip--visible) .timeline-floating-time {
+  bottom: calc(100% + var(--heatmap-strip-height, 34px) + var(--heatmap-controls-gap) + 8px);
+}
+
+/* Парящий информационный бейдж над тепловой картой при наведении (Zero-Blur DirectWrite ClearType) */
 .waveform-activity-strip__badge {
   position: absolute;
   bottom: calc(100% + 8px);
@@ -1009,14 +1022,16 @@ html[data-glow="off"] .timeline__thumb {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--bg-elevated);
+  background: var(--bg-modal-solid, #11141c);
   border: 1px solid var(--border-pill);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) 10px;
-  box-shadow: var(--shadow-card-hover);
-  font-size: var(--fs-xs);
+  border-radius: var(--radius-md);
+  padding: 5px 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.65),
+              0 1px 3px rgba(0, 0, 0, 0.45),
+              inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  font-size: var(--fs-sm);
   font-weight: 600;
-  color: var(--text-primary);
+  color: #ffffff;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: 0.4px;
@@ -1025,10 +1040,11 @@ html[data-glow="off"] .timeline__thumb {
   white-space: nowrap;
   user-select: none;
   z-index: var(--z-float);
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
+  text-rendering: optimizeLegibility;
+  font-synthesis: none;
   opacity: 1;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  will-change: transform;
 }
 
 .waveform-activity-strip__badge-time {
@@ -1095,7 +1111,7 @@ html[data-glow="off"] .timeline__thumb {
 .waveform-activity-strip__retry-btn {
   background: var(--bg-card, rgba(255, 255, 255, 0.1));
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.18));
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   color: var(--text-primary, #fff);
   padding: 1px 6px;
   font-size: 9px;
@@ -1110,3 +1126,6 @@ html[data-glow="off"] .timeline__thumb {
 }
 
 
+
+/* Fullscreen remains legible in both normal and compact toolbars. */
+#btn-fullscreen > svg { width: 24px; height: 24px; }

@@ -1,4 +1,5 @@
 name: "自动发布 L-MPV"
+run-name: "发布 ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }}"
 
 on:
   push:
@@ -10,6 +11,18 @@ on:
         description: '发布标签（例如 v2.7.0-build1），留空则自动使用 v+版本号'
         required: false
         default: ''
+      include_ffmpeg:
+        description: '单独附带 ffmpeg.exe（供用户增量更新）'
+        type: boolean
+        default: false
+      include_mediainfo:
+        description: '单独附带 mediainfo.dll（供用户增量更新）'
+        type: boolean
+        default: false
+      include_libmpv:
+        description: '单独附带 libmpv-2.dll（供用户增量更新）'
+        type: boolean
+        default: false
 
 jobs:
   publish-tauri:
@@ -57,6 +70,12 @@ jobs:
       - name: 编译前自检（汉化版挂点是否还在）
         run: node scripts/check-patches.mjs
 
+      - name: 配置 Python（用于校验 deps-v1 组件版本）
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+          architecture: x64
+
       - name: 下载并解压外部组件 (libmpv-2.dll, ffmpeg.exe, mediainfo.dll)
         shell: pwsh
         run: |
@@ -66,12 +85,25 @@ jobs:
           Expand-Archive -Path mpv_libs.zip -DestinationPath src-tauri/binaries/ -Force
           Remove-Item mpv_libs.zip -Force
 
-          # 检查全部三个原生组件是否存在且完整
+          # 检查全部三个原生组件是否存在且完整，并刷新 LastWriteTime
           $binFiles = @("src-tauri/binaries/libmpv-2.dll", "src-tauri/binaries/ffmpeg.exe", "src-tauri/binaries/mediainfo.dll")
           foreach ($f in $binFiles) {
             if (-not (Test-Path $f)) { throw "严重错误: src-tauri/binaries 目录缺少原生依赖文件: $f" }
-            if ((Get-Item $f).Length -eq 0) { throw "严重错误: 文件 $f 是空文件!" }
+            $item = Get-Item $f
+            if ($item.Length -eq 0) { throw "严重错误: 文件 $f 是空文件!" }
+            $item.LastWriteTime = Get-Date
           }
+          Invoke-WebRequest -Uri "https://github.com/Menely/L-MPV/releases/download/deps-v1/dependency-sources.json" -OutFile "deps-sources.json"
+          $sources = Get-Content deps-sources.json -Raw | ConvertFrom-Json
+          $pins = Get-Content scripts/animejanai-dependencies.json -Raw | ConvertFrom-Json
+          $expectedMpv = "https://github.com/the-database/mpv-winbuild/releases/download/$($pins.mpv_release)/$($pins.mpv_asset)"
+          if ($sources.libmpv -ne $expectedMpv) { throw "deps-v1 里的 libmpv 版本不符，请先更新 deps-v1。" }
+          if ($sources.ffmpeg -notmatch '/ffmpeg-(\d{4}-\d{2}-\d{2}-git-[a-f0-9]+)-essentials_build\.7z$') { throw "deps-v1 里的 FFmpeg 来源无效" }
+          $ffmpegTag = $Matches[1]
+          if ($sources.mediainfo -notmatch '/libmediainfo0/(\d+\.\d+(?:\.\d+)?)/') { throw "deps-v1 里的 MediaInfo 来源无效" }
+          $mediaInfoVersion = $Matches[1]
+          python scripts/verify-native-dependencies.py src-tauri/binaries --ffmpeg-tag $ffmpegTag --mediainfo-version $mediaInfoVersion
+          if ($LASTEXITCODE -ne 0) { throw "deps-v1 与当前构建的版本/架构不匹配" }
           Write-Host "所有原生依赖检查通过 (libmpv-2.dll 含 vf_animejanai, ffmpeg.exe, mediainfo.dll)。"
 
       - name: 从 Git 标签同步版本号到 package.json 和 Cargo.toml
@@ -99,7 +131,7 @@ jobs:
           releaseDraft: false
           prerelease: false
 
-      - name: 发布便携版压缩包、独立 l-mpv.exe 和完整性清单
+      - name: 发布便携版压缩包和选定组件
         shell: pwsh
         run: |
           $tag = "${{ steps.meta.outputs.tag }}"
@@ -110,7 +142,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path "Portable-L-MPV/screenshots" | Out-Null
           New-Item -ItemType Directory -Force -Path "Portable-L-MPV/fonts" | Out-Null
           Copy-Item "src/assets/fonts/*" -Destination "Portable-L-MPV/fonts/" -Force
-          
+
           Copy-Item "src-tauri/target/release/l-mpv.exe" -Destination "Portable-L-MPV/l-mpv.exe" -Force
           Copy-Item "src-tauri/binaries/libmpv-2.dll" -Destination "Portable-L-MPV/libmpv-2.dll" -Force
           Copy-Item "src-tauri/binaries/ffmpeg.exe" -Destination "Portable-L-MPV/ffmpeg.exe" -Force
@@ -132,20 +164,52 @@ jobs:
           Copy-Item "$assetRoot/config/script-assets/*" -Destination "Portable-L-MPV/config/script-assets/" -Recurse -Force
           Write-Host "Lua 插件打包完成。"
 
+          # 根据勾选项确定需要单独上传的组件（tag 推送时全部上传）
+          $isTagPush = ("${{ github.event_name }}" -eq "push")
+          $includeFfmpeg = $isTagPush -or ("${{ github.event.inputs.include_ffmpeg }}" -eq "true")
+          $includeMediainfo = $isTagPush -or ("${{ github.event.inputs.include_mediainfo }}" -eq "true")
+          $includeLibmpv = $isTagPush -or ("${{ github.event.inputs.include_libmpv }}" -eq "true")
+
+          # 校验编译出的 l-mpv.exe 内含当前 libmpv-2.dll 的 BLAKE3 哈希
+          Push-Location src-tauri
+          $libmpvJson = & cargo run --release -q --example gen_checksums -- "../Portable-L-MPV/libmpv-2.dll" | Out-String | ConvertFrom-Json
+          Pop-Location
+          $expectedMpvHash = $libmpvJson.files."libmpv-2.dll"
+          $exeAscii = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes("Portable-L-MPV/l-mpv.exe"))
+          if (-not $exeAscii.Contains($expectedMpvHash)) {
+            throw "严重完整性错误: 编译出的 l-mpv.exe 内不含当前 libmpv-2.dll 的 BLAKE3 哈希 ($expectedMpvHash)!"
+          }
+          Write-Host "完整性校验通过: l-mpv.exe 内含最新 libmpv-2.dll 哈希 ($expectedMpvHash)。"
+
+          # 组装 checksums.json 的文件清单并逐个上传
+          $publishAssets = @("Portable-L-MPV/l-mpv.exe")
+          if ($includeFfmpeg) { $publishAssets += "Portable-L-MPV/ffmpeg.exe" }
+          if ($includeMediainfo) { $publishAssets += "Portable-L-MPV/mediainfo.dll" }
+          if ($includeLibmpv) { $publishAssets += "Portable-L-MPV/libmpv-2.dll" }
+
+          Write-Host "选定用于增量更新的文件: $($publishAssets -join ', ')"
+
           Write-Host "正在生成完整性清单 checksums.json..."
           Push-Location src-tauri
-          cargo run --release -q --example gen_checksums -- -o ../checksums.json ../Portable-L-MPV
+          $argsList = @("run", "--release", "-q", "--example", "gen_checksums", "--", "-o", "../checksums.json") + ($publishAssets | ForEach-Object { "../$_" })
+          & cargo $argsList
           Pop-Location
+
           Copy-Item "checksums.json" -Destination "Portable-L-MPV/checksums.json" -Force
 
           $portableZip = "L-MPV-$tag-portable.zip"
           Write-Host "正在创建压缩包 $portableZip ..."
           Compress-Archive -Path "Portable-L-MPV/*" -DestinationPath $portableZip -Force
-          
+
           Write-Host "正在上传产物到发布页 $tag ..."
           gh release upload $tag $portableZip --clobber
-          gh release upload $tag "src-tauri/target/release/l-mpv.exe#l-mpv.exe" --clobber
           gh release upload $tag "checksums.json#checksums.json" --clobber
+
+          foreach ($assetPath in $publishAssets) {
+            $fileName = Split-Path -Leaf $assetPath
+            Write-Host "正在上传 $fileName 到发布页..."
+            gh release upload $tag "${assetPath}#${fileName}" --clobber
+          }
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -162,4 +226,3 @@ jobs:
           }
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

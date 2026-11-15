@@ -87,6 +87,7 @@ import {
   preloadPresetsSettings,
   preloadUpscaleSettings,
 } from "../settings/lib/settingsTabPreload";
+import { preloadSystemDiagnostics } from "../settings/lib/systemDiagnostics";
 import { isMotionAllowed, getCloseTimeoutMs } from "../../utils/animationUtils";
 import { SettingsPreset } from "../../utils/presetsUtils";
 import {
@@ -153,7 +154,7 @@ export function SettingsModal({ onClose, onShowUpdate }: SettingsModalProps) {
   const [autoLoadTracks, setAutoLoadTracks] = useState<boolean>(false);
   const [autoSelectExternalAudio, setAutoSelectExternalAudio] = useState<boolean>(false);
   const [playNextOnEnd, setPlayNextOnEnd] = useState<boolean>(true);
-  const [appVersion, setAppVersion] = useState<string>("2.7.0");
+  const [appVersion, setAppVersion] = useState<string>("2.7.3");
   const [visibleButtons, setVisibleButtons] = useState<Record<string, boolean>>({});
   const [skipOpeningSeconds, setSkipOpeningSeconds] = useState<number>(() => Number(localStorage.getItem('l-mpv-skip-opening-seconds') || 90));
   const [seekStepSeconds, setSeekStepSeconds] = useState<number>(() => getSavedSeekStepSeconds());
@@ -202,7 +203,6 @@ export function SettingsModal({ onClose, onShowUpdate }: SettingsModalProps) {
 
   useEffect(() => {
     preloadPresetsSettings();
-    preloadUpscaleSettings();
     returnFocusRef.current = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
@@ -895,8 +895,8 @@ export function SettingsModal({ onClose, onShowUpdate }: SettingsModalProps) {
           aria-labelledby="settings-modal-title"
           style={{
             width: 720,
-            maxWidth: "95vw",
-            maxHeight: "75vh",
+            maxWidth: "min(95vw, calc(100vw / var(--ui-scale, 1) - 24px))",
+            maxHeight: "min(75vh, calc(100dvh / var(--ui-scale, 1) - 24px))",
             display: "flex",
             flexDirection: "column",
           }}
@@ -937,6 +937,11 @@ export function SettingsModal({ onClose, onShowUpdate }: SettingsModalProps) {
                 <button
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
+                  onMouseEnter={() => {
+                    if (tab.id === "presets") preloadPresetsSettings();
+                    if (tab.id === "upscaling") preloadUpscaleSettings();
+                    if (tab.id === "integration") preloadSystemDiagnostics();
+                  }}
                   className={`settings-tab-btn ${isActive ? "settings-tab-btn--active" : ""}`}
                 >
                   <Icon size={16} className="settings-tab-icon" />
@@ -947,7 +952,7 @@ export function SettingsModal({ onClose, onShowUpdate }: SettingsModalProps) {
           </div>
 
           {/* Тело модального окна */}
-          <div className="modal__body" ref={bodyRef} style={{ padding: "16px 20px 10px 20px" }}>
+          <div className="modal__body" ref={bodyRef} style={{ padding: "var(--settings-section-padding) 20px" }}>
             <div ref={panelRef} className="settings-tab-panel">
               {renderTabContent()}
             </div>
@@ -968,8 +973,8 @@ export function SettingsModal({ onClose, onShowUpdate }: SettingsModalProps) {
           aria-labelledby="settings-modal-title"
           style={{
             width: 720,
-            maxWidth: "95vw",
-            maxHeight: "80vh",
+            maxWidth: "min(95vw, calc(100vw / var(--ui-scale, 1) - 24px))",
+            maxHeight: "min(80vh, calc(100dvh / var(--ui-scale, 1) - 24px))",
             display: "flex",
             flexDirection: "column",
           }}
@@ -1001,6 +1006,7 @@ export function SettingsModal({ onClose, onShowUpdate }: SettingsModalProps) {
                     onMouseEnter={() => {
                       if (tab.id === "presets") preloadPresetsSettings();
                       if (tab.id === "upscaling") preloadUpscaleSettings();
+                      if (tab.id === "integration") preloadSystemDiagnostics();
                     }}
                     className={`settings-tab-btn ${isActive ? "settings-tab-btn--active" : ""}`}
                     aria-label={tab.label}
@@ -1013,16 +1019,18 @@ export function SettingsModal({ onClose, onShowUpdate }: SettingsModalProps) {
             </div>
 
             {/* Карточка 3: Крестик */}
-            <button
-              ref={closeButtonRef}
-              type="button"
-              className="settings-card settings-card--close"
-              onClick={handleClose}
-              id="btn-settings-close"
-              aria-label={dict.settings.close}
-            >
-              <X size={20} />
-            </button>
+            <div className="settings-card settings-card--close">
+              <button
+                ref={closeButtonRef}
+                type="button"
+                className="island-action"
+                onClick={handleClose}
+                id="btn-settings-close"
+                aria-label={dict.settings.close}
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
 
           {/* Карточка 2: Основное тело настроек */}

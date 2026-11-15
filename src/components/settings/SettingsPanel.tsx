@@ -6,13 +6,13 @@ import {
   Keyboard,
   SlidersHorizontal,
   Palette,
-  Link,
   Loader2,
   Sparkles,
   Layers,
   RefreshCw,
   X,
   Settings,
+  Cpu,
 } from "lucide-react";
 import { useTranslation } from "../../i18n/LanguageContext";
 import {
@@ -39,13 +39,14 @@ import { UpdateInfo } from "../modals/UpdateModal";
 import { PresetsSection } from "./sections/PresetsSection";
 import { UpscalingSettingsSection } from "./sections/UpscalingSettingsSection";
 import { HotkeysSettingsTab } from "./tabs/HotkeysSettingsTab";
-import { IntegrationSettingsTab } from "./tabs/IntegrationSettingsTab";
+import { SystemSettingsTab } from "./tabs/SystemSettingsTab";
 import { AppearanceSettingsTab } from "./tabs/AppearanceSettingsTab";
 import { GeneralSettingsTab } from "./tabs/GeneralSettingsTab";
 import {
   preloadPresetsSettings,
   preloadUpscaleSettings,
 } from "./lib/settingsTabPreload";
+import { preloadSystemDiagnostics } from "./lib/systemDiagnostics";
 import { isMotionAllowed, getCloseTimeoutMs } from "../../utils/animationUtils";
 import {
   getSettingsViewSession,
@@ -119,7 +120,7 @@ const SECTION_DEFS = [
   { id: "section-presets",     Icon: Layers,            labelKey: "presets"      },
   { id: "section-upscaling",   Icon: Sparkles,          labelKey: "upscaling"    },
   { id: "section-hotkeys",     Icon: Keyboard,          labelKey: "hotkeys"      },
-  { id: "section-integration", Icon: Link,              labelKey: "integration"  },
+  { id: "section-system",      Icon: Cpu,               labelKey: "system"       },
 ] as const;
 
 type SectionId = (typeof SECTION_DEFS)[number]["id"];
@@ -129,7 +130,7 @@ const MemoizedAppearanceSettingsTab = memo(AppearanceSettingsTab);
 const MemoizedPresetsSection = memo(PresetsSection);
 const MemoizedUpscalingSettingsSection = memo(UpscalingSettingsSection);
 const MemoizedHotkeysSettingsTab = memo(HotkeysSettingsTab);
-const MemoizedIntegrationSettingsTab = memo(IntegrationSettingsTab);
+const MemoizedSystemSettingsTab = memo(SystemSettingsTab);
 
 interface SectionBlockProps {
   id: string;
@@ -187,7 +188,7 @@ export function SettingsPanel({ onClose, onShowUpdate }: SettingsPanelProps) {
   const [autoLoadTracks, setAutoLoadTracks] = useState<boolean>(false);
   const [autoSelectExternalAudio, setAutoSelectExternalAudio] = useState<boolean>(false);
   const [playNextOnEnd, setPlayNextOnEnd] = useState<boolean>(true);
-  const [appVersion, setAppVersion] = useState<string>("2.7.0");
+  const [appVersion, setAppVersion] = useState<string>("2.7.3");
   const [visibleButtons, setVisibleButtons] = useState<Record<string, boolean>>({});
   const [skipOpeningSeconds, setSkipOpeningSeconds] = useState<number>(() => Number(localStorage.getItem('l-mpv-skip-opening-seconds') || 90));
   const [seekStepSeconds, setSeekStepSeconds] = useState<number>(() => getSavedSeekStepSeconds());
@@ -316,6 +317,7 @@ export function SettingsPanel({ onClose, onShowUpdate }: SettingsPanelProps) {
     });
     if (id === "section-presets") preloadPresetsSettings();
     if (id === "section-upscaling") preloadUpscaleSettings();
+    if (id === "section-system") preloadSystemDiagnostics();
   }, []);
 
   useEffect(() => {
@@ -353,17 +355,33 @@ export function SettingsPanel({ onClose, onShowUpdate }: SettingsPanelProps) {
       },
     );
 
+    // These sections start native verification/diagnostics on mount. Prefetching
+    // them outside the viewport would turn opening General into a full probe.
+    const visibleObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) markSectionMounted(entry.target.id as SectionId);
+        });
+      },
+      { root, threshold: 0 },
+    );
+
     SECTION_DEFS.forEach(({ id }) => {
       const element = document.getElementById(id);
       if (element) {
         activeObserver.observe(element);
-        preloadObserver.observe(element);
+        if (id === "section-upscaling" || id === "section-system") {
+          visibleObserver.observe(element);
+        } else {
+          preloadObserver.observe(element);
+        }
       }
     });
 
     return () => {
       activeObserver.disconnect();
       preloadObserver.disconnect();
+      visibleObserver.disconnect();
     };
   }, [markSectionMounted]);
 
@@ -926,12 +944,12 @@ export function SettingsPanel({ onClose, onShowUpdate }: SettingsPanelProps) {
       </SectionBlock>
 
       <SectionBlock
-        id="section-integration"
-        Icon={Link}
-        label={dict.settings.tabs.integration}
-        isMounted={mountedSections.has("section-integration")}
+        id="section-system"
+        Icon={Cpu}
+        label={dict.settings.tabs.system}
+        isMounted={mountedSections.has("section-system")}
       >
-        <MemoizedIntegrationSettingsTab />
+        <MemoizedSystemSettingsTab />
       </SectionBlock>
     </>
   );
@@ -1064,14 +1082,16 @@ export function SettingsPanel({ onClose, onShowUpdate }: SettingsPanelProps) {
               </div>
 
               {/* Карточка 3: Крестик */}
-              <button
-                type="button"
-                className="settings-card settings-card--close"
-                onClick={handleClose}
-                aria-label={dict.settings.close}
-              >
-                <X size={20} />
-              </button>
+              <div className="settings-card settings-card--close">
+                <button
+                  type="button"
+                  className="island-action"
+                  onClick={handleClose}
+                  aria-label={dict.settings.close}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             {/* Карточка 2: Основное тело настроек со скроллом */}

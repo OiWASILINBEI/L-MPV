@@ -461,6 +461,7 @@ export function ContextMenu({
   const handleSetRotation = useCallback(async (degrees: number) => {
     try {
       await invoke("set_rotation", { degrees });
+      window.dispatchEvent(new Event("l-mpv-preview-transform-changed"));
       setCurrentRotation(degrees);
       showOsd(dict.osd.rotation(degrees));
     } catch (e) {

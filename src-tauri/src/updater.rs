@@ -1,3 +1,6 @@
+mod transaction;
+use transaction::{build_transactional_update_bat, UpdateSession, UpdateStaging};
+
 use serde::{Deserialize, Serialize};
 
 use tauri::Emitter;
@@ -488,6 +491,7 @@ pub async fn download_and_install_update(
     _asset_name: String,
     tag: Option<String>,
 ) -> Result<(), String> {
+    let _session = UpdateSession::acquire()?;
     let api_client = create_http_client()?;
     let release = match tag.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
         Some(target_tag) => fetch_github_release_by_tag(&api_client, target_tag).await?,
@@ -531,27 +535,19 @@ pub async fn download_and_install_update(
     }
 
     let exe_dir = get_app_dir()?;
-    let updates_dir = exe_dir.join(".updates");
+    // Each instance owns its staging directory; another player must never
+    // clear files that a download or an already launched updater still uses.
+    let mut staging = UpdateStaging::create(&exe_dir)
+        .map_err(|e| format!("Не удалось создать папку обновления: {e}"))?;
+    let updates_dir = staging.path().to_owned();
 
-    // Каталог очищается целиком. update.bat выполняет `xcopy /s /y /q "*"`,
-    // то есть копирует из .updates ВСЁ, что там лежит. Прерванная на прошлом
-    // попытке загрузка, файл от старого релиза или любая посторонняя мелочь
-    // иначе оказались бы в папке плеера. Без очистки оборванный файл
-    // libmpv-2.dll перезаписал бы рабочий.
-    if updates_dir.exists() {
-        tokio::fs::remove_dir_all(&updates_dir)
-            .await
-            .map_err(|e| format!("Не удалось очистить папку .updates: {}", e))?;
-    }
-    tokio::fs::create_dir_all(&updates_dir)
-        .await
-        .map_err(|e| format!("Не удалось создать папку .updates: {}", e))?;
-
-    // Сохраняем проверенный манифест целостности в .updates, чтобы скрипт обновления
+    // Сохраняем проверенный манифест целостности в staging, чтобы скрипт обновления
     // скопировал его в корень папки плеера рядом с обновлёнными бинарниками.
-    if let Ok(manifest_json) = serde_json::to_string_pretty(&manifest) {
-        let _ = tokio::fs::write(updates_dir.join(CHECKSUM_ASSET_NAME), manifest_json).await;
-    }
+    let manifest_json = serde_json::to_string_pretty(&manifest)
+        .map_err(|e| format!("Не удалось подготовить манифест обновления: {e}"))?;
+    tokio::fs::write(updates_dir.join(CHECKSUM_ASSET_NAME), manifest_json)
+        .await
+        .map_err(|e| format!("Не удалось сохранить манифест обновления: {e}"))?;
 
     let total_bytes: u64 = portable_assets.iter().map(|a| a.size.unwrap_or(0)).sum();
     let mut downloaded_bytes: u64 = 0;
@@ -685,32 +681,51 @@ pub async fn download_and_install_update(
         .unwrap_or_else(|| "l-mpv.exe".to_string());
 
     // Если пользователь переименовал exe (например, L-MPV.exe или плеер.exe),
-    // подгоняем имя файла в папке обновлений, чтобы xcopy перезаписал именно его.
+    // подгоняем имя файла в папке обновлений, чтобы замена обновила именно его.
     if !current_exe_name.eq_ignore_ascii_case("l-mpv.exe") {
         let default_exe = updates_dir.join("l-mpv.exe");
         if default_exe.exists() {
-            let _ = tokio::fs::rename(&default_exe, updates_dir.join(&current_exe_name)).await;
+            tokio::fs::rename(&default_exe, updates_dir.join(&current_exe_name))
+                .await
+                .map_err(|e| format!("Не удалось подготовить обновление переименованного EXE: {e}"))?;
         }
     }
 
-    let bat_content = format!(
-        "@echo off\r\n\
-        chcp 65001 > NUL\r\n\
-        timeout /t 3 /nobreak > NUL\r\n\
-        xcopy /s /y /q /r \"*\" \"..\\\"\r\n\
-        del \"..\\update.bat\" 2>NUL\r\n\
-        start \"\" \"..\\{}\"\r\n\
-        cd ..\r\n\
-        start /b cmd /c \"timeout /t 2 > NUL & rmdir /s /q .updates\"\r\n\
-        exit\r\n",
-        current_exe_name
-    );
+    let mut staged_files: Vec<String> = portable_assets
+        .iter()
+        .map(|a| {
+            if a.name.eq_ignore_ascii_case("l-mpv.exe")
+                && !current_exe_name.eq_ignore_ascii_case("l-mpv.exe")
+            {
+                current_exe_name.clone()
+            } else {
+                a.name.clone()
+            }
+        })
+        .collect();
+    if updates_dir.join(CHECKSUM_ASSET_NAME).exists() {
+        staged_files.push(CHECKSUM_ASSET_NAME.to_string());
+    }
+    staged_files.sort();
+    staged_files.dedup();
+
+    let bat_content = build_transactional_update_bat(&current_exe_name, &staged_files);
 
     tokio::fs::write(&bat_path, bat_content)
         .await
         .map_err(|e| format!("Не удалось создать update.bat: {}", e))?;
+    let apply_path = updates_dir.join("apply.ps1");
+    tokio::fs::write(&apply_path, include_str!("updater/apply.ps1"))
+        .await
+        .map_err(|e| format!("Не удалось создать скрипт применения обновления: {e}"))?;
 
-    let mut cmd = std::process::Command::new(&bat_path);
+    crate::upscale::shutdown_active_processes();
+
+    let mut cmd = std::process::Command::new("powershell.exe");
+    cmd.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"])
+        .arg(&apply_path)
+        .arg("-StagingDirectory")
+        .arg(&updates_dir);
     cmd.current_dir(&updates_dir);
 
     #[cfg(target_os = "windows")]
@@ -722,6 +737,7 @@ pub async fn download_and_install_update(
 
     cmd.spawn()
         .map_err(|e| format!("Не удалось запустить скрипт обновления: {}", e))?;
+    staging.hand_off();
 
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
     std::process::exit(0);
@@ -809,5 +825,5 @@ mod tests {
 
         assert!(get_legacy_checksums("v9.9.9").is_none());
     }
-}
 
+}

@@ -134,7 +134,7 @@ export const ModelTensorRtAction: React.FC<ModelTensorRtActionProps> = React.mem
           style={{
             height: "var(--size-action-compact)",
             padding: "0 8px",
-            borderRadius: "var(--radius-sm, 6px)",
+            borderRadius: "var(--radius-control)",
             fontSize: "var(--fs-xs)",
             fontWeight: 600,
             display: "inline-flex",
@@ -151,16 +151,17 @@ export const ModelTensorRtAction: React.FC<ModelTensorRtActionProps> = React.mem
 
         <button
           type="button"
-          className="btn btn--secondary"
+          className="btn btn--secondary model-compile-action"
           onClick={onPrecompile}
           disabled={!!compilingModel}
+          aria-label={dict.settings.upscaling.trtRecompileTitle}
           title={dict.settings.upscaling.trtRecompileTitle}
           style={{
             width: "var(--size-action-compact)",
             height: "var(--size-action-compact)",
             minWidth: "var(--size-action-compact)",
             padding: "var(--space-0)",
-            borderRadius: "var(--radius-sm, 6px)",
+            borderRadius: "var(--radius-control)",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
@@ -178,14 +179,14 @@ export const ModelTensorRtAction: React.FC<ModelTensorRtActionProps> = React.mem
   return (
     <button
       type="button"
-      className="btn btn--secondary"
+      className="btn btn--secondary model-compile-action"
       onClick={onPrecompile}
       disabled={!!compilingModel}
-      title={dict.settings.upscaling.trtCompileTitle}
+      title={model.engine_outdated ? dict.settings.upscaling.trtRebuildRequired : dict.settings.upscaling.trtCompileTitle}
       style={{
         height: "var(--size-action-compact)",
         padding: "0 8px",
-        borderRadius: "var(--radius-sm, 6px)",
+        borderRadius: "var(--radius-control)",
         fontSize: "var(--fs-xs)",
         fontWeight: 600,
         display: "inline-flex",
@@ -196,8 +197,8 @@ export const ModelTensorRtAction: React.FC<ModelTensorRtActionProps> = React.mem
         cursor: "pointer",
       }}
       >
-      <Zap size={14} color="var(--accent-text, var(--accent))" />
-      <span>{dict.settings.upscaling.trtCompileBadge}</span>
+      {model.engine_outdated ? <RefreshCw size={14} color="var(--warning-text)" /> : <Zap size={14} color="var(--accent-text, var(--accent))" />}
+      <span>{model.engine_outdated ? dict.settings.upscaling.trtRebuildBadge : dict.settings.upscaling.trtCompileBadge}</span>
     </button>
   );
 });

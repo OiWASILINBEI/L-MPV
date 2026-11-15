@@ -1,3 +1,4 @@
+import { upscaleErrorMessage } from "./utils/upscaleCompatibility";
 import {
   useState,
   useCallback,
@@ -11,18 +12,21 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, emit } from "@tauri-apps/api/event";
 import { usePlayerState } from "./contexts/PlayerStateContext";
 import { useOsd, showOsd } from "./hooks/useOsd";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { useAutoUpscale } from "./hooks/useAutoUpscale";
 import { getCurrentWindow, PhysicalSize } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Play } from "lucide-react";
 import "./index.css";
 import { Titlebar } from "./components/player/Titlebar";
+import { FileDragPreview } from "./components/player/FileDragPreview";
 import { PlayerControls } from "./components/player/PlayerControls";
 import { ContextMenu } from "./components/player/ContextMenu";
 import { PlaylistDrawer } from "./components/player/PlaylistDrawer";
 import { SeekIndicator } from "./components/player/SeekIndicator";
 import { formatSpeedValue } from "./components/player/controls";
 import { cleanMediaName } from "./utils/mediaNameUtils";
+import { VolumeIndicator } from "./components/player/VolumeIndicator";
+import { triggerVolumeFeedback } from "./utils/volumeFeedback";
 import { UpdateInfo } from "./components/modals/UpdateModal";
 import { getVisualizerConfig, saveVisualizerConfig, VisualizerMode } from "./components/player/AudioVisualizer";
 import { applyAccentColor } from "./utils/colorUtils";
@@ -31,21 +35,21 @@ import {
   isKeyboardEventMatch,
   VIDEO_MOUSE_ACTIONS,
 } from "./utils/hotkeyUtils";
+import { getFavoriteModel } from "./utils/favoriteModel";
 import { normalizeAmbientSettings } from "./utils/ambientSettingsUtils";
 import { addRecentFile } from "./utils/recentFilesUtils";
 import { getDict, getEffectiveLocale, saveLocale, type Locale } from "./i18n";
 import { useTranslation } from "./i18n/LanguageContext";
 import { getSavedUiSettingsStyle, type UiSettingsStyle } from "./utils/uiThemeUtils";
 import { getSavedSeekStepSeconds, triggerSeekIndicator } from "./utils/seekUtils";
+import { subtitleControlsOffset } from "./utils/subtitleUiGeometry";
 import { resetSettingsViewSession } from "./components/settings/lib/settingsViewSession";
-// Тяжёлые модалки и панели настроек грузятся лениво: в стартовый бандл не попадают,
-// парсятся только при первом открытии (dnd-kit едет вместе с настройками).
-const SettingsModal = lazy(() =>
-  import("./components/modals/SettingsModal").then((m) => ({ default: m.SettingsModal }))
-);
-const SettingsPanel = lazy(() =>
-  import("./components/settings/SettingsPanel").then((m) => ({ default: m.SettingsPanel }))
-);
+import {
+  SettingsModalView as SettingsModal,
+  SettingsPanelView as SettingsPanel,
+  useSettingsModulePreload,
+} from "./components/settings/lib/settingsModulePreload";
+// Settings stay out of the startup bundle; warm the selected view after the first frame.
 const MediaInfoModal = lazy(() =>
   import("./components/modals/MediaInfoModal").then((m) => ({ default: m.MediaInfoModal }))
 );
@@ -117,6 +121,10 @@ function App() {
   });
   
   const [settingsStyle, setSettingsStyle] = useState<UiSettingsStyle>(getSavedUiSettingsStyle);
+  useSettingsModulePreload(
+    hasMedia && Boolean(mediaInfo?.video_ready || mediaInfo?.video_track === false),
+    settingsStyle,
+  );
   const settingsWasOpenRef = useRef(false);
 
   const openSettings = useCallback(() => {
@@ -345,52 +353,61 @@ function App() {
 
   const shouldHideControlsInUpperHalf = hasMedia && hideControlsInUpperHalf && isCursorInUpperHalf;
   const isControlsVisible = hasMedia && !isIdle && !shouldHideControlsInUpperHalf;
-  const lastAppliedAvoidControlsRef = useRef<boolean | null>(null);
-  const lastAvoidMediaPathRef = useRef<string | undefined>(undefined);
-  const lastWindowHeightRef = useRef<number>(window.innerHeight);
-
-  // Динамическое смещение субтитров выше интерфейса при его активности
+  const subtitleUpdateQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  // Measure the rendered panel: capsule, modern, docked and CSS zoom have
+  // different heights. Layout changes must update subtitles without mouse input.
   useEffect(() => {
     if (!hasMedia) {
-      lastAppliedAvoidControlsRef.current = null;
-      lastAvoidMediaPathRef.current = undefined;
+      subtitleUpdateQueueRef.current = subtitleUpdateQueueRef.current.catch(() => {}).then(() =>
+        invoke("update_subtitles_avoid_ui", { controlsVisible: false }),
+      ).catch(console.error);
       return;
     }
-
-    const isNewMedia = lastAvoidMediaPathRef.current !== mediaInfo?.path;
-    lastAvoidMediaPathRef.current = mediaInfo?.path;
-    if (isNewMedia) {
-      lastAppliedAvoidControlsRef.current = null;
-    }
-
-    const targetVisible = subtitlesAvoidUi ? isControlsVisible : false;
-
-    const applySubtitlePosition = () => {
-      lastWindowHeightRef.current = window.innerHeight;
-      invoke("update_subtitles_avoid_ui", {
-        controlsVisible: targetVisible,
-        windowHeight: window.innerHeight,
-      }).catch(console.error);
-    };
-
-    const heightChanged = Math.abs(window.innerHeight - lastWindowHeightRef.current)> 2;
-    if (lastAppliedAvoidControlsRef.current !== targetVisible || isNewMedia || (targetVisible && heightChanged)) {
-      lastAppliedAvoidControlsRef.current = targetVisible;
-      applySubtitlePosition();
-    }
-
-    // При изменении размера окна или переключении fullscreen пересчитываем позицию
-    const handleResize = () => {
-      if (subtitlesAvoidUi && isControlsVisible) {
-        if (Math.abs(window.innerHeight - lastWindowHeightRef.current)> 2) {
-          applySubtitlePosition();
+    const wrapper = document.querySelector<HTMLElement>(".player-controls-wrapper");
+    let cancelled = false;
+    let pending = false;
+    let running = false;
+    let lastApplied = "";
+    const apply = async () => {
+      pending = true;
+      if (running) return;
+      running = true;
+      while (pending && !cancelled) {
+        pending = false;
+        const controls = wrapper?.querySelector<HTMLElement>(".player-controls");
+        const bottom = wrapper ? parseFloat(getComputedStyle(wrapper).bottom) || 0 : 0;
+        const offset = controls ? subtitleControlsOffset(
+          controls.getBoundingClientRect().height, controls.offsetHeight, bottom,
+        ) : 0;
+        const controlsVisible = subtitlesAvoidUi && isControlsVisible && offset > 0;
+        const args = { controlsVisible, windowHeight: window.innerHeight, controlsBottom: offset };
+        const key = JSON.stringify(args);
+        if (key === lastApplied) continue;
+        try {
+          const update = subtitleUpdateQueueRef.current.catch(() => {}).then(() => {
+            if (!cancelled) return invoke("update_subtitles_avoid_ui", args);
+          });
+          subtitleUpdateQueueRef.current = update;
+          await update;
+          lastApplied = key;
+        } catch (error) {
+          console.error("Subtitle UI positioning failed:", error);
         }
       }
+      running = false;
     };
-
-    window.addEventListener("resize", handleResize);
+    const observer = new ResizeObserver(() => { void apply(); });
+    // The wrapper survives style switches; its panel subtree does not.
+    if (wrapper) observer.observe(wrapper);
+    const update = () => { void apply(); };
+    window.addEventListener("resize", update);
+    window.addEventListener("l-mpv-settings-changed", update);
+    void apply();
     return () => {
-      window.removeEventListener("resize", handleResize);
+      cancelled = true;
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+      window.removeEventListener("l-mpv-settings-changed", update);
     };
   }, [hasMedia, mediaInfo?.path, subtitlesAvoidUi, isControlsVisible, isFullscreen]);
 
@@ -436,13 +453,39 @@ function App() {
   }, [mediaInfo?.path]);
 
   const isWindowRevealedRef = useRef(false);
+  const startupRetryRef = useRef<number | null>(null);
+  const startupRetryActiveRef = useRef(true);
+  useEffect(() => {
+    startupRetryActiveRef.current = true;
+    return () => {
+      startupRetryActiveRef.current = false;
+      if (startupRetryRef.current !== null) window.clearTimeout(startupRetryRef.current);
+    };
+  }, []);
 
   const revealWindow = useCallback(async () => {
     if (!isWindowRevealedRef.current && !isStandaloneModeRef.current) {
-      isWindowRevealedRef.current = true;
       try {
         await getCurrentWindow().show();
-      } catch {}
+        isWindowRevealedRef.current = true;
+      } catch { return; }
+    }
+    if (isWindowRevealedRef.current && hasMediaRef.current && !isStandaloneModeRef.current) {
+      // Let React's transparent video surface commit before releasing initial audio.
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      try {
+        if (await invoke<boolean>("complete_startup_playback")) {
+          if (startupRetryRef.current !== null) window.clearTimeout(startupRetryRef.current);
+          startupRetryRef.current = null;
+          window.dispatchEvent(new Event("l-mpv-force-poll"));
+        } else if (startupRetryRef.current === null && startupRetryActiveRef.current) {
+          // Track auto-selection may finish without changing video dimensions.
+          startupRetryRef.current = window.setTimeout(() => {
+            startupRetryRef.current = null;
+            void revealWindow();
+          }, 100);
+        }
+      } catch (error) { console.error("Startup playback completion failed:", error); }
     }
   }, []);
 
@@ -544,24 +587,12 @@ function App() {
     mediaInfo?.width,
     mediaInfo?.height,
     mediaInfo?.video_track,
+    mediaInfo?.video_ready,
     resizeWindowForVideo,
     revealWindow,
   ]);
 
-  // Автоматическое применение AI Upscaling при загрузке нового файла
-  useEffect(() => {
-    if (mediaInfo?.path) {
-      const mode = localStorage.getItem("l-mpv-upscale-mode") || "off";
-      if (mode === "ai") {
-        const slot = parseInt(localStorage.getItem("l-mpv-upscale-slot") || "1001", 10);
-        const backend = localStorage.getItem("l-mpv-upscale-backend") || "DirectML";
-        const selectedModel = localStorage.getItem("l-mpv-upscale-selected-model") || "";
-        invoke("apply_upscale_settings", { 
-          settings: { mode, active_slot: slot, backend, selected_model: selectedModel }
-        }).catch(console.error);
-      }
-    }
-  }, [mediaInfo?.path]);
+  useAutoUpscale(mediaInfo?.path);
 
   // Защитный таймер безопасности (на случай долгого ответа декодера или ошибок)
   useEffect(() => {
@@ -656,6 +687,7 @@ function App() {
               "avi",
               "mov",
               "webm",
+              "yuv",
             ],
           },
         ],
@@ -738,14 +770,26 @@ function App() {
       }
       case "volumeUp":
         curProlongControlsIfActive();
-        if (curMediaInfo) curSetVolume(Math.min(150, (curMediaInfo.volume ?? 100) + 5));
+        if (curMediaInfo) {
+          const volume = Math.min(150, (curMediaInfo.volume ?? 100) + 5);
+          curSetVolume(volume);
+          triggerVolumeFeedback(volume);
+        }
         break;
       case "volumeDown":
         curProlongControlsIfActive();
-        if (curMediaInfo) curSetVolume(Math.max(0, (curMediaInfo.volume ?? 100) - 5));
+        if (curMediaInfo) {
+          const volume = Math.max(0, (curMediaInfo.volume ?? 100) - 5);
+          curSetVolume(volume);
+          triggerVolumeFeedback(volume);
+        }
         break;
       case "toggleMute":
-        if (curMediaInfo) curSetVolume(curMediaInfo.volume === 0 ? 100 : 0);
+        if (curMediaInfo) {
+          const volume = curMediaInfo.volume === 0 ? 100 : 0;
+          curSetVolume(volume);
+          triggerVolumeFeedback(volume);
+        }
         break;
       case "fullscreen": {
         const wasFullscreen = latestRef.current.isFullscreen;
@@ -853,6 +897,7 @@ function App() {
         videoRotationRef.current = nextRot;
         try {
           await invoke("set_rotation", { degrees: nextRot });
+          window.dispatchEvent(new Event("l-mpv-preview-transform-changed"));
         } catch (e) {
           console.error(e);
         }
@@ -1037,8 +1082,53 @@ function App() {
           localStorage.setItem("l-mpv-upscale-mode", "off");
           triggerOsd(dict.osd.upscaleOff, 2000);
           window.dispatchEvent(new Event("l-mpv-settings-changed"));
-        } catch (e) { console.error("Ошибка отключения апскейлинга:", e); }
+        } catch (e) { console.error("Ошибка отключения апскейлинга:", e); triggerOsd(dict.osd.upscaleError(upscaleErrorMessage(e, dict)), 3000, true); }
         break;
+      case "upscaleFavorite": {
+        try {
+          const favorite = getFavoriteModel();
+          if (!favorite) {
+            triggerOsd(dict.osd.upscaleNoFavorite, 2500);
+            break;
+          }
+          const models = await invoke<Array<{ slot: number; display_name: string; filename: string }>>("scan_onnx_models").catch(() => []);
+          const targetModel = models.find((m) => m.filename === favorite);
+
+          if (!targetModel) {
+            triggerOsd(dict.osd.upscaleFavoriteNotFound(favorite), 2500);
+            break;
+          }
+
+          const backend = localStorage.getItem("l-mpv-upscale-backend") || "DirectML";
+          const mode = localStorage.getItem("l-mpv-upscale-mode") || "off";
+          const curSlot = Number(localStorage.getItem("l-mpv-upscale-slot") || 1001);
+          const curModel = localStorage.getItem("l-mpv-upscale-selected-model") || "";
+          const isFavoriteActive = mode === "ai" && (curModel ? curModel === targetModel.filename : curSlot === targetModel.slot);
+
+          if (isFavoriteActive) {
+            await invoke("switch_upscale_network_hotkey", { slot: 0, backend });
+            localStorage.setItem("l-mpv-upscale-mode", "off");
+            triggerOsd(dict.osd.upscaleOff, 2000);
+          } else {
+            await invoke("switch_upscale_network_hotkey", { slot: targetModel.slot, backend });
+            localStorage.setItem("l-mpv-upscale-mode", "ai");
+            localStorage.setItem("l-mpv-upscale-slot", String(targetModel.slot));
+            localStorage.setItem("l-mpv-upscale-selected-model", targetModel.filename);
+
+            const isHideModelNames = localStorage.getItem("l-mpv-hide-model-names") === "true";
+            const modelTitle = isHideModelNames
+              ? (curLocale === "en" ? "Favorite model" : "Избранная модель")
+              : targetModel.display_name;
+            triggerOsd(dict.osd.upscaleModel(modelTitle), 2000);
+          }
+
+          window.dispatchEvent(new Event("l-mpv-settings-changed"));
+        } catch (e) {
+          console.error("Ошибка переключения избранной модели по хоткею:", e);
+          triggerOsd(dict.osd.upscaleError(upscaleErrorMessage(e, dict)), 3000, true);
+        }
+        break;
+      }
       case "upscaleNet1":
       case "upscaleNet2":
       case "upscaleNet3":
@@ -1058,11 +1148,10 @@ function App() {
             const backend = localStorage.getItem("l-mpv-upscale-backend") || "DirectML";
 
             // При выборе любой модели по хоткею гарантированно активируем режим "ai"
+            await invoke("switch_upscale_network_hotkey", { slot, backend });
             localStorage.setItem("l-mpv-upscale-mode", "ai");
             localStorage.setItem("l-mpv-upscale-slot", String(slot));
             localStorage.setItem("l-mpv-upscale-selected-model", targetModel.filename);
-
-            await invoke("switch_upscale_network_hotkey", { slot, backend });
 
             const isHideModelNames = localStorage.getItem("l-mpv-hide-model-names") === "true";
             const modelTitle = isHideModelNames ? (curLocale === "en" ? `Model #${index + 1}` : curLocale === "zh" ? `模型 #${index + 1}` : `Модель #${index + 1}`) : targetModel.display_name;
@@ -1075,6 +1164,7 @@ function App() {
           }
         } catch (e) {
           console.error("Ошибка переключения нейросети по хоткею:", e);
+          triggerOsd(dict.osd.upscaleError(upscaleErrorMessage(e, dict)), 3000, true);
         }
         break;
       }
@@ -1293,10 +1383,8 @@ function App() {
     };
   }, [executeAction]);
 
-  // ─── Обработка перетаскивания (Drag & Drop / Хотлоад) ─────────
-  useEffect(() => {
-    let unlistenFn: (() => void) | undefined;
-
+  // ─── Открытие файла / подключение внешней дорожки ─────────
+  const handleDroppedFile = useCallback(async (file: string) => {
     const isAudioFile = (p: string) => {
       const ext = p.split('.').pop()?.toLowerCase() || '';
       return ['mka', 'm4a', 'aac', 'mp3', 'ogg', 'opus', 'flac', 'wav', 'ac3', 'eac3', 'dts', 'thd', 'wma', 'aiff', 'ape'].includes(ext);
@@ -1307,66 +1395,37 @@ function App() {
       return ['srt', 'ass', 'ssa', 'vtt', 'sub', 'idx', 'sup'].includes(ext);
     };
 
-    const setupDragDrop = async () => {
-      const webview = getCurrentWebview();
-      const unlisten = await webview.onDragDropEvent(
-        async (event) => {
-          if (
-            event.payload.type === "drop" &&
-            event.payload.paths.length> 0
-          ) {
-            const file = event.payload.paths[0];
-            const curHasMedia = latestRef.current.hasMedia;
-            const hotloadEnabled = localStorage.getItem('l-mpv-hotload-enabled') === 'true';
-            const d = getDict(getEffectiveLocale());
+    const curHasMedia = latestRef.current.hasMedia;
+    const hotloadEnabled = localStorage.getItem('l-mpv-hotload-enabled') === 'true';
+    const d = getDict(getEffectiveLocale());
 
-            if (hotloadEnabled && curHasMedia && isAudioFile(file)) {
-              try {
-                await invoke("load_audio_file", { path: file });
-                await latestRef.current.loadTracks();
-                const fileName = file.replace(/\\/g, '/').split('/').pop() || file;
-                showOsd(d.osd.audioLoaded(fileName));
-              } catch (err) {
-                console.error("Ошибка подключения аудиодорожки (Хотлоад):", err);
-              }
-            } else if (hotloadEnabled && curHasMedia && isSubtitleFile(file)) {
-              try {
-                await invoke("load_subtitle_file", { path: file });
-                await latestRef.current.loadTracks();
-                const fileName = file.replace(/\\/g, '/').split('/').pop() || file;
-                showOsd(d.osd.subsLoaded(fileName));
-              } catch (err) {
-                console.error("Ошибка подключения субтитров (Хотлоад):", err);
-                showOsd(d.osd.subtitlesLoadErr, { isError: true });
-              }
-            } else {
-              try {
-                await invoke("open_file", { path: file });
-              } catch (err) {
-                console.error("Ошибка открытия файла:", err);
-                showOsd(d.osd.openFileErr, { isError: true });
-              }
-            }
-          }
-        }
-      );
-      return unlisten;
-    };
-
-    let isMounted = true;
-
-    setupDragDrop().then((unlisten) => {
-      if (!isMounted) {
-        unlisten();
-      } else {
-        unlistenFn = unlisten;
+    if (hotloadEnabled && curHasMedia && isAudioFile(file)) {
+      try {
+        await invoke("load_audio_file", { path: file });
+        await latestRef.current.loadTracks();
+        const fileName = file.replace(/\\/g, '/').split('/').pop() || file;
+        showOsd(d.osd.audioLoaded(fileName));
+      } catch (err) {
+        console.error("Ошибка подключения аудиодорожки (Хотлоад):", err);
       }
-    });
-
-    return () => {
-      isMounted = false;
-      if (unlistenFn) unlistenFn();
-    };
+    } else if (hotloadEnabled && curHasMedia && isSubtitleFile(file)) {
+      try {
+        await invoke("load_subtitle_file", { path: file });
+        await latestRef.current.loadTracks();
+        const fileName = file.replace(/\\/g, '/').split('/').pop() || file;
+        showOsd(d.osd.subsLoaded(fileName));
+      } catch (err) {
+        console.error("Ошибка подключения субтитров (Хотлоад):", err);
+        showOsd(d.osd.subtitlesLoadErr, { isError: true });
+      }
+    } else {
+      try {
+        await invoke("open_file", { path: file });
+      } catch (err) {
+        console.error("Ошибка открытия файла:", err);
+        showOsd(d.osd.openFileErr, { isError: true });
+      }
+    }
   }, []);
 
   const handleDragOver = useCallback(
@@ -1390,6 +1449,7 @@ function App() {
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       >
+      <FileDragPreview onFileDrop={handleDroppedFile} />
       <Titlebar title="L-MPV" mediaTitle={mediaTitle} />
 
       {/* OSD подписи текущего кадра и статистики */}
@@ -1468,6 +1528,7 @@ function App() {
               const delta = e.deltaY < 0 ? 5 : -5;
               const newVol = Math.max(0, Math.min(150, currentVol + delta));
               setVolume(newVol);
+              triggerVolumeFeedback(newVol);
             }
           }
         }}
@@ -1521,6 +1582,7 @@ function App() {
 
       {/* Всплывающий оверлей быстрой перемотки в стиле YouTube */}
       <SeekIndicator />
+      <VolumeIndicator />
 
       {contextMenu && (
         <ContextMenu
@@ -1591,17 +1653,10 @@ function App() {
               setPendingUpdate(info);
               setShowUpdateModal(true);
             };
-            return settingsStyle === "modal" ? (
-              <SettingsModal
-                onClose={closeSettings}
-                onShowUpdate={handleShowUpdateFromSettings}
-              />
-            ) : (
-              <SettingsPanel
-                onClose={closeSettings}
-                onShowUpdate={handleShowUpdateFromSettings}
-              />
-            );
+            const SettingsView = settingsStyle === "modal"
+              ? SettingsModal
+              : SettingsPanel;
+            return <SettingsView onClose={closeSettings} onShowUpdate={handleShowUpdateFromSettings} />;
           })()}
         </Suspense>
       )}

@@ -1,3 +1,4 @@
+import { isTimelinePreviewEnabled, setTimelinePreviewEnabled } from "../../../utils/timelinePreviewPreference";
 import React, { useCallback, useEffect, useState, useMemo } from "react";
 import {
   FolderOpen, Film, Download, Camera, RotateCcw, Monitor, AudioLines, AudioWaveform, Sparkles,
@@ -21,6 +22,7 @@ import {
 import { useTranslation } from "../../../i18n/LanguageContext";
 import { usePlayerState } from "../../../contexts/PlayerStateContext";
 import type { Locale } from "../../../i18n/types";
+import { isVolumeIndicatorEnabled, setVolumeIndicatorEnabled, isVolumeOsdEnabled, setVolumeOsdEnabled } from "../../../utils/volumeFeedback";
 
 /* ── Допустимые значения настроек видео/аудио ───────────────
    Держатся здесь, а не внутри разметки: и кнопки, и сравнение
@@ -104,7 +106,9 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
   }), [isRu]);
 
   // ── Состояние настроек оптимизации видео/аудио ──
+  const [volumeOsd, setVolumeOsdState] = useState(isVolumeOsdEnabled);
   const [audioLimiter, setAudioLimiter] = useState(true);
+  const [volumeIndicatorEnabled, setVolumeIndicatorEnabledState] = useState(isVolumeIndicatorEnabled);
   const [debandEnabled, setDebandEnabled] = useState(false);
   const [debandPreset, setDebandPreset] = useState("balanced");
   const [audioLatencyFix, setAudioLatencyFix] = useState(true);
@@ -112,11 +116,15 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
   const [hwdecMode, setHwdecMode] = useState("auto-safe");
   const [audioNormalize, setAudioNormalize] = useState("no");
   const [demuxerCacheMb, setDemuxerCacheMb] = useState(64);
+  const [timelinePreviewEnabled, setTimelinePreviewEnabledState] = useState(isTimelinePreviewEnabled);
   const [waveformEnabled, setWaveformEnabledState] = useState<boolean>(isWaveformEnabled);
 
   useEffect(() => {
     const handleSettingsChanged = () => {
       setWaveformEnabledState(isWaveformEnabled());
+      setTimelinePreviewEnabledState(isTimelinePreviewEnabled());
+      setVolumeIndicatorEnabledState(isVolumeIndicatorEnabled());
+      setVolumeOsdState(isVolumeOsdEnabled());
     };
     window.addEventListener("l-mpv-settings-changed", handleSettingsChanged);
     return () => {
@@ -247,8 +255,8 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
   const cardStyle: React.CSSProperties = {
     display: "flex",
     flexDirection: "column",
-    gap: 8,
-    padding: "12px 14px",
+    gap: "var(--space-4)",
+    padding: "var(--padding-card)",
     background: "var(--surface-card)",
     borderRadius: "var(--radius-md)",
     border: "1px solid var(--border)",
@@ -257,7 +265,7 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
   };
 
   return (
-    <div className="modal__section col col-gap-5">
+    <div className="modal__section settings-stack">
 
       {/* ── 0. Язык интерфейса ── */}
       <AccordionSection
@@ -293,7 +301,7 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
                     fontWeight: 700,
                     letterSpacing: "0.5px",
                     padding: "2px 5px",
-                    borderRadius: "4px",
+                    borderRadius: "var(--radius-xs)",
                     background: locale === "ru" ? "var(--accent)" : "rgba(255, 255, 255, 0.08)",
                     color: locale === "ru" ? "var(--on-accent)" : "var(--text-muted)",
                     lineHeight: 1,
@@ -330,7 +338,7 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
                     fontWeight: 700,
                     letterSpacing: "0.5px",
                     padding: "2px 5px",
-                    borderRadius: "4px",
+                    borderRadius: "var(--radius-xs)",
                     background: locale === "en" ? "var(--accent)" : "rgba(255, 255, 255, 0.08)",
                     color: locale === "en" ? "var(--on-accent)" : "var(--text-muted)",
                     lineHeight: 1,
@@ -367,7 +375,7 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
                     fontWeight: 700,
                     letterSpacing: "0.5px",
                     padding: "2px 5px",
-                    borderRadius: "4px",
+                    borderRadius: "var(--radius-xs)",
                     background: locale === "zh" ? "var(--accent)" : "rgba(255, 255, 255, 0.08)",
                     color: locale === "zh" ? "var(--on-accent)" : "var(--text-muted)",
                     lineHeight: 1,
@@ -495,7 +503,7 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
               <button
                 type="button"
                 className={`compact-segment-btn ${playNextOnEnd ? "compact-segment-btn--active" : ""}`}
-                style={{ height: 42, padding: "6px 10px", flexDirection: "column", alignItems: "flex-start", textAlign: "left", gap: "var(--space-1)" }}
+                style={{ minHeight: 48, height: "auto", whiteSpace: "normal", overflowWrap: "anywhere", padding: "6px 10px", flexDirection: "column", alignItems: "flex-start", textAlign: "left", gap: "var(--space-1)" }}
                 onClick={async () => {
                   setPlayNextOnEnd(true);
                   try {
@@ -517,7 +525,7 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
               <button
                 type="button"
                 className={`compact-segment-btn ${!playNextOnEnd ? "compact-segment-btn--active" : ""}`}
-                style={{ height: 42, padding: "6px 10px", flexDirection: "column", alignItems: "flex-start", textAlign: "left", gap: "var(--space-1)" }}
+                style={{ minHeight: 48, height: "auto", whiteSpace: "normal", overflowWrap: "anywhere", padding: "6px 10px", flexDirection: "column", alignItems: "flex-start", textAlign: "left", gap: "var(--space-1)" }}
                 onClick={async () => {
                   setPlayNextOnEnd(false);
                   try {
@@ -599,6 +607,23 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
                 <span className="t-label-xs">
                   {dict.settings.general.hideControlsDesc}
                 </span>
+              </div>
+            </label>
+          </div>
+
+          <div style={cardStyle} className="theme-card">
+            <label className="option-row">
+              <input type="checkbox" className="ui-checkbox" checked={timelinePreviewEnabled}
+                onChange={event => {
+                  setTimelinePreviewEnabled(event.target.checked);
+                  setTimelinePreviewEnabledState(event.target.checked);
+                }} />
+              <div className="option-body">
+                <div className="row-center row-gap-3">
+                  <Film size={14} className="t-accent" />
+                  <span className="t-label">{dict.settings.general.timelinePreviewTitle}</span>
+                </div>
+                <span className="t-label-xs">{dict.settings.general.timelinePreviewDesc}</span>
               </div>
             </label>
           </div>
@@ -774,14 +799,6 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
                     console.error("Ошибка сохранения настройки subtitles_avoid_ui:", err);
                     return;
                   }
-                  try {
-                    await invoke("update_subtitles_avoid_ui", {
-                      controlsVisible: val,
-                      windowHeight: window.innerHeight,
-                    });
-                  } catch (err) {
-                    console.warn("Не удалось обновить позицию субтитров:", err);
-                  }
                   localStorage.setItem("l-mpv-subtitles-avoid-ui", val ? "true" : "false");
                   window.dispatchEvent(new Event("l-mpv-settings-changed"));
                 }}
@@ -871,10 +888,6 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
         icon={<Clapperboard size={18} />}
         title={dict.settings.general.videoAudioSection}
         >
-        <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)", marginBottom: "var(--space-5)", lineHeight: 1.35 }}>
-          {dict.settings.general.videoAudioDesc}
-        </div>
-
         <div className="option-tiles-grid">
           {/* 4.1 Обработка кадра */}
           <OptionCard
@@ -954,6 +967,19 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
               label={dict.settings.general.audioLatencyFixTitle}
               title={dict.settings.general.audioLatencyFixDesc}
             />
+            <div className="volume-indicator-options">
+            <OptionToggleRow
+              checked={volumeIndicatorEnabled}
+              onChange={setVolumeIndicatorEnabled}
+              label={dict.settings.general.volumeIndicatorTitle}
+              title={dict.settings.general.volumeIndicatorDesc}
+            />
+              <label className="volume-indicator-options__osd">
+                <input type="checkbox" className="ui-checkbox" checked={volumeOsd}
+                  disabled={!volumeIndicatorEnabled} onChange={e => setVolumeOsdEnabled(e.target.checked)} />
+                <span>OSD</span>
+              </label>
+            </div>
           </OptionCard>
 
           {/* 4.3 Устранение артефактов (дебандинг) */}
