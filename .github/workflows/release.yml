@@ -127,7 +127,7 @@ jobs:
         with:
           tagName: ${{ steps.meta.outputs.tag }}
           releaseName: 'L-MPV ${{ steps.meta.outputs.label }}'
-          releaseBody: 'L-MPV 媒体播放器简体中文汉化版（详见下方中文更新日志）。'
+          releaseBody: ''
           releaseDraft: false
           prerelease: false
 
@@ -209,20 +209,6 @@ jobs:
             $fileName = Split-Path -Leaf $assetPath
             Write-Host "正在上传 $fileName 到发布页..."
             gh release upload $tag "${assetPath}#${fileName}" --clobber
-          }
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 应用纯中文发布说明
-        shell: pwsh
-        run: |
-          $tag = "${{ steps.meta.outputs.tag }}"
-          if (Test-Path ".github/release-notes-zh.md") {
-            Write-Host "正在将中文更新日志应用到发布页 $tag ..."
-            gh release edit $tag --notes-file .github/release-notes-zh.md
-            Write-Host "中文发布说明已更新完成。"
-          } else {
-            Write-Host "未找到 .github/release-notes-zh.md，跳过发布说明更新。"
           }
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
