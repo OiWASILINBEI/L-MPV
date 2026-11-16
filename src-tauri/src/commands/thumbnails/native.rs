@@ -8,9 +8,13 @@ use std::{
     time::{Duration, Instant},
 };
 
+type ReadPermit<'a> = Option<&'a dyn Fn() -> bool>;
+
 #[derive(Default)]
 pub(super) struct NativeDecoder {
     core: Option<PreviewCore>,
+    /// Позиция и режим начальной загрузки, если её PLAYBACK_RESTART ещё не получен.
+    loading: Option<(f64, bool)>,
     identity: String,
     last_used: Option<Instant>,
     snapshot_failed_identity: Option<String>,
@@ -33,6 +37,8 @@ mod tests {
             hdr: None,
             transforms: Default::default(),
             profile: super::super::profile::DecodeProfile::Snapshot,
+            identity: String::new(),
+            size: (320, 180),
         };
         let cancelled = AtomicBool::new(false);
         let stopped = AtomicBool::new(false);
@@ -79,6 +85,200 @@ mod tests {
         }
     }
 
+    /// Замер задержек: LMPV_THUMB_ROOT и LMPV_THUMB_BENCH (путь к видео).
+    #[test]
+    #[ignore = "requires LMPV_THUMB_ROOT and LMPV_THUMB_BENCH"]
+    fn bench_hover_latency() {
+        let root = std::path::PathBuf::from(std::env::var_os("LMPV_THUMB_ROOT").unwrap());
+        let path = std::path::PathBuf::from(std::env::var_os("LMPV_THUMB_BENCH").unwrap());
+        let duration: f64 = std::env::var("LMPV_THUMB_BENCH_DURATION")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(300.0);
+        let cancelled = AtomicBool::new(false);
+        let stopped = AtomicBool::new(false);
+        let mut decoder = NativeDecoder::default();
+        let mut source = SourceRequest {
+            path,
+            stream: "0:0".into(),
+            vid: "1".into(),
+            seconds: duration * 0.1,
+            hdr: None,
+            transforms: Default::default(),
+            profile: super::super::profile::DecodeProfile::Hardware,
+            identity: String::new(),
+            size: (320, 180),
+        };
+        let ms = |d: Duration| d.as_secs_f64() * 1000.0;
+        let began = Instant::now();
+        decoder
+            .extract(&root, &source, false, &cancelled, &stopped)
+            .unwrap();
+        println!("BENCH cold first keyframe: {:.1} ms", ms(began.elapsed()));
+        let mut grid = Vec::new();
+        for step in 0..30 {
+            source.seconds = (duration * (0.05 + 0.03 * step as f64)).floor();
+            let began = Instant::now();
+            decoder
+                .extract(&root, &source, false, &cancelled, &stopped)
+                .unwrap();
+            grid.push(ms(began.elapsed()));
+        }
+        let mut exact = Vec::new();
+        for step in 0..10 {
+            source.seconds = duration * (0.07 + 0.09 * step as f64) + 3.37;
+            let began = Instant::now();
+            decoder
+                .extract(&root, &source, true, &cancelled, &stopped)
+                .unwrap();
+            exact.push(ms(began.elapsed()));
+        }
+        let avg = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
+        let max = |v: &[f64]| v.iter().cloned().fold(0.0, f64::max);
+        println!(
+            "BENCH keyframe sweep: avg {:.1} ms, max {:.1} ms",
+            avg(&grid),
+            max(&grid)
+        );
+        println!(
+            "BENCH exact: avg {:.1} ms, max {:.1} ms",
+            avg(&exact),
+            max(&exact)
+        );
+        // Холодный старт с отменой во время загрузки и следующим запросом.
+        let mut decoder = NativeDecoder::default();
+        source.seconds = (duration * 0.5).floor();
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                std::thread::sleep(Duration::from_millis(15));
+                cancelled.store(true, Ordering::Release);
+            });
+            let _ = decoder.extract(&root, &source, false, &cancelled, &stopped);
+        });
+        cancelled.store(false, Ordering::Release);
+        source.seconds = (duration * 0.97).floor();
+        let began = Instant::now();
+        decoder
+            .extract(&root, &source, false, &cancelled, &stopped)
+            .unwrap();
+        println!(
+            "BENCH request after cancel during cold start: {:.1} ms",
+            ms(began.elapsed())
+        );
+    }
+
+    #[test]
+    #[ignore = "requires LMPV_THUMB_ROOT and LMPV_THUMB_FIXTURE"]
+    fn prewarm_and_storyboard_tiles_share_the_core_without_mixing_frames() {
+        let root = std::path::PathBuf::from(std::env::var_os("LMPV_THUMB_ROOT").unwrap());
+        let path = std::path::PathBuf::from(std::env::var_os("LMPV_THUMB_FIXTURE").unwrap())
+            .canonicalize()
+            .unwrap();
+        let cancelled = AtomicBool::new(false);
+        let stopped = AtomicBool::new(false);
+        let mut decoder = NativeDecoder::default();
+        let mut source = SourceRequest {
+            path,
+            stream: "0:0".into(),
+            vid: "1".into(),
+            seconds: 0.5,
+            hdr: None,
+            transforms: Default::default(),
+            profile: super::super::profile::DecodeProfile::Hardware,
+            identity: String::new(),
+            size: (320, 180),
+        };
+        let pixel = |bytes: &[u8]| {
+            let image = image::load_from_memory(bytes).unwrap().to_rgb8();
+            (
+                image.dimensions(),
+                image.get_pixel(image.width() / 2, image.height() / 2).0,
+            )
+        };
+        // Прогрев не ждёт кадра: загрузка завершится в следующем запросе.
+        decoder.prewarm(&root, &source);
+        assert!(decoder.core.is_some() && decoder.loading.is_some());
+        source.seconds = 4.2;
+        let (size, green) = pixel(
+            &decoder
+                .extract(&root, &source, true, &cancelled, &stopped)
+                .unwrap(),
+        );
+        assert_eq!(size, (320, 180));
+        assert!(
+            green[1] > 100 && green[0] < 80,
+            "exact after prewarm: {green:?}"
+        );
+        assert!(decoder.loading.is_none());
+        // Losing playback priority during a seek yields without destroying the
+        // warm decoder. A following exact request must still return its frame.
+        for _ in 0..8 {
+            let checks = std::cell::Cell::new(0);
+            let permit = || {
+                checks.set(checks.get() + 1);
+                checks.get() < 2
+            };
+            source.seconds = 0.2;
+            assert_eq!(
+                decoder
+                    .extract_tile(
+                        &root,
+                        &source,
+                        (240, 135),
+                        &cancelled,
+                        &stopped,
+                        Some(&permit)
+                    )
+                    .unwrap_err(),
+                "THUMBNAIL_CANCELLED"
+            );
+            assert!(decoder.core.is_some());
+            source.seconds = 4.2;
+            let (_, green) = pixel(
+                &decoder
+                    .extract(&root, &source, true, &cancelled, &stopped)
+                    .unwrap(),
+            );
+            assert!(
+                green[1] > 100 && green[0] < 80,
+                "frame after background yield: {green:?}"
+            );
+        }
+        // Кадр раскадровки — ключевой кадр в своём размере, с его позицией.
+        source.seconds = 3.5;
+        let (bytes, actual) = decoder
+            .extract_tile(&root, &source, (240, 135), &cancelled, &stopped, None)
+            .unwrap();
+        let (size, color) = pixel(&bytes);
+        assert_eq!(size, (240, 135));
+        assert!((0.0..=3.6).contains(&actual), "keyframe position {actual}");
+        // The RGB fixture may have a long GOP (only keyframe 0) or a keyframe
+        // at 3s. Check the image against its actual timestamp, not a fixed GOP.
+        let matches = if actual < 2.0 {
+            color[0] > 100 && color[2] < 80
+        } else {
+            color[2] > 100 && color[0] < 80
+        };
+        assert!(matches, "tile at keyframe {actual}: {color:?}");
+        // Кадр раскадровки не попадает в кеш живых интервалов (другой размер).
+        let (size, _) = pixel(
+            &decoder
+                .extract(&root, &source, false, &cancelled, &stopped)
+                .unwrap(),
+        );
+        assert_eq!(size, (320, 180));
+        // HiDPI-размер пересоздаёт ядро под новый размер.
+        source.size = (480, 270);
+        source.seconds = 0.2;
+        let (size, red) = pixel(
+            &decoder
+                .extract(&root, &source, true, &cancelled, &stopped)
+                .unwrap(),
+        );
+        assert_eq!(size, (480, 270));
+        assert!(red[0] > 100 && red[2] < 80, "{red:?}");
+    }
+
     #[test]
     fn expired_fallback_deadline_never_initializes_another_context() {
         let mut decoder = NativeDecoder::default();
@@ -90,6 +290,8 @@ mod tests {
             hdr: None,
             transforms: Default::default(),
             profile: super::super::profile::DecodeProfile::Snapshot,
+            identity: String::new(),
+            size: (320, 180),
         };
         assert_eq!(
             decoder
@@ -97,14 +299,33 @@ mod tests {
                     Path::new("not-opened"),
                     &source,
                     false,
+                    Output::Live,
                     &AtomicBool::new(false),
                     &AtomicBool::new(false),
-                    Instant::now() - Duration::from_millis(1)
+                    Instant::now() - Duration::from_millis(1),
+                    None,
                 )
                 .unwrap_err(),
             "THUMBNAIL_MPV_TIMEOUT"
         );
         assert!(decoder.core.is_none());
+        assert_eq!(
+            decoder
+                .extract_tile(
+                    Path::new("not-opened"),
+                    &source,
+                    (240, 135),
+                    &AtomicBool::new(false),
+                    &AtomicBool::new(false),
+                    Some(&|| false)
+                )
+                .unwrap_err(),
+            "THUMBNAIL_CANCELLED"
+        );
+        assert!(
+            decoder.core.is_none(),
+            "background work without playback priority must not open libmpv"
+        );
     }
 
     #[test]
@@ -122,6 +343,8 @@ mod tests {
             hdr: None,
             transforms: Default::default(),
             profile: super::super::profile::DecodeProfile::Snapshot,
+            identity: String::new(),
+            size: (320, 180),
         };
         let bytes = decoder
             .extract(&root, &source, true, &cancelled, &stopped)
@@ -198,6 +421,8 @@ mod tests {
             hdr: None,
             transforms: Default::default(),
             profile: super::super::profile::DecodeProfile::Snapshot,
+            identity: String::new(),
+            size: (320, 180),
         };
         for rotation in ["0", "90", "180", "270"] {
             source.transforms.rotation = rotation.into();
@@ -276,6 +501,8 @@ mod tests {
             hdr: None,
             transforms: Default::default(),
             profile: super::super::profile::DecodeProfile::Snapshot,
+            identity: String::new(),
+            size: (320, 180),
         };
         let center = |bytes: Vec<u8>| {
             image::load_from_memory(&bytes)
@@ -286,11 +513,12 @@ mod tests {
         };
         let main = PreviewCore::new(
             &root,
-            &decoder::preview_filter(None),
+            &decoder::preview_filter(None, (320, 180)),
             "1",
             0.4,
             true,
             crate::mpv_manager::preview::PreviewBackend::Software,
+            (320, 180),
         )
         .unwrap();
         main.command(&["loadfile", source.path.to_str().unwrap()])
@@ -301,6 +529,7 @@ mod tests {
             &stopped,
             None,
             Instant::now() + Duration::from_secs(3),
+            None,
         )
         .unwrap();
         let main_position = main.position().unwrap();
@@ -344,8 +573,9 @@ mod tests {
         );
         source.seconds = 3.1;
         // Drop the idle context; cancel during initialization/file loading, not
-        // before extract. Its events must never be reused by the next request.
-        decoder.last_used = Some(Instant::now() - Duration::from_secs(6));
+        // before extract. The loading context survives, but its late events must
+        // never be reused as the answer to the next request's seek.
+        decoder.last_used = Some(Instant::now() - IDLE_RELEASE - Duration::from_secs(1));
         decoder.release_if_idle();
         assert!(decoder.core.is_none());
         std::thread::scope(|scope| {
@@ -360,7 +590,10 @@ mod tests {
                 "THUMBNAIL_CANCELLED"
             );
         });
-        assert!(decoder.core.is_none());
+        assert!(
+            decoder.core.is_some(),
+            "cancel during loading must keep the context (no repeated cold start)"
+        );
         cancelled.store(false, Ordering::Release);
         source.seconds = 4.2;
         let next = center(
@@ -396,6 +629,8 @@ mod tests {
             hdr: None,
             transforms: Default::default(),
             profile: super::super::profile::DecodeProfile::Snapshot,
+            identity: String::new(),
+            size: (320, 180),
         };
         // A rapid pointer move may cancel the first request before file-loaded.
         cancelled.store(true, Ordering::Release);
@@ -508,20 +743,36 @@ mod tests {
     }
 }
 
+/// Сколько живёт простаивающее ядро превью. Раскадровка закрывает холодный
+/// старт при быстром ведении, поэтому ядро не нужно держать долго.
+pub(super) const IDLE_RELEASE: Duration = Duration::from_secs(20);
+
+/// Как закодировать результат: размер живой миниатюры или кадра раскадровки.
+#[derive(Clone, Copy)]
+pub(super) enum Output {
+    Live,
+    Tile((u32, u32)),
+}
+
 impl NativeDecoder {
-    /// Очистка неактивного контекста libmpv по истечении 5 секунд бездействия.
+    /// Освобождает неактивный контекст libmpv после `IDLE_RELEASE` бездействия.
     /// Возвращает true, если декодер еще активен, или false, если освобожден.
     pub fn release_if_idle(&mut self) -> bool {
         if self
             .last_used
-            .is_some_and(|time| time.elapsed() >= Duration::from_secs(5))
+            .is_some_and(|time| time.elapsed() >= IDLE_RELEASE)
         {
-            self.core = None;
+            self.reset_core();
             self.last_used = None;
             false
         } else {
             self.core.is_some()
         }
+    }
+
+    fn reset_core(&mut self) {
+        self.core = None;
+        self.loading = None;
     }
 
     pub fn extract(
@@ -536,46 +787,69 @@ impl NativeDecoder {
             root,
             source,
             exact,
+            Output::Live,
             cancelled,
             stopped,
             Instant::now() + Duration::from_secs(3),
+            None,
         )
+        .map(|(bytes, _)| bytes)
     }
 
-    fn extract_until(
+    /// Кадр раскадровки: ближайший ключевой кадр, закодированный в `size`.
+    /// Возвращает JPEG и фактическую позицию ключевого кадра.
+    pub fn extract_tile(
         &mut self,
         root: &Path,
         source: &SourceRequest,
-        exact: bool,
+        size: (u32, u32),
         cancelled: &AtomicBool,
         stopped: &AtomicBool,
-        deadline: Instant,
-    ) -> Result<Vec<u8>, String> {
-        // Identity includes file metadata, track and conversion, but not seek position.
-        if cancelled.load(Ordering::Acquire) || stopped.load(Ordering::Acquire) {
-            return Err("THUMBNAIL_CANCELLED".into());
-        }
-        if Instant::now() >= deadline {
-            return Err("THUMBNAIL_MPV_TIMEOUT".into());
-        }
-        let identity = super::cache::cache_key(
-            &source.path,
-            &source.cache_stream(),
-            source.hdr.map_or(0, |h| h as u8),
-            0.0,
+        permit: ReadPermit<'_>,
+    ) -> Result<(Vec<u8>, f64), String> {
+        self.extract_until(
+            root,
+            source,
             false,
-        )?;
+            Output::Tile(size),
+            cancelled,
+            stopped,
+            Instant::now() + Duration::from_secs(3),
+            permit,
+        )
+    }
+
+    /// Создаёт ядро и начинает загрузку файла, не дожидаясь первого кадра.
+    /// Следующий запрос дождётся окончания загрузки (см. `loading`).
+    pub fn prewarm(&mut self, root: &Path, source: &SourceRequest) {
+        self.adopt_identity(source);
+        if self.core.is_none() {
+            let (using_snapshot, profile) = self.plan(source);
+            if self
+                .open(root, source, false, using_snapshot, profile)
+                .is_err()
+            {
+                self.reset_core();
+            }
+        }
+        self.last_used = Some(Instant::now());
+    }
+
+    fn adopt_identity(&mut self, source: &SourceRequest) -> String {
+        // Identity includes file metadata, track, transforms, size and conversion,
+        // but not seek position.
+        let identity = source.decoder_identity();
         if self.identity != identity {
-            self.core = None;
+            self.reset_core();
             self.coarse.clear();
             self.identity = identity.clone();
         }
-        if let Some(bytes) = self.coarse.get(source.seconds, exact) {
-            self.last_used = Some(Instant::now());
-            return Ok(bytes);
-        }
+        identity
+    }
+
+    fn plan(&self, source: &SourceRequest) -> (bool, super::profile::DecodeProfile) {
         let using_snapshot = source.profile == super::profile::DecodeProfile::Snapshot
-            && self.snapshot_failed_identity.as_ref() != Some(&identity)
+            && self.snapshot_failed_identity.as_ref() != Some(&self.identity)
             && source.transforms.is_identity()
             && source.hdr.is_none();
         let profile =
@@ -584,102 +858,162 @@ impl NativeDecoder {
             } else {
                 source.profile
             };
-        let fresh = self.core.is_none();
+        (using_snapshot, profile)
+    }
+
+    fn open(
+        &mut self,
+        root: &Path,
+        source: &SourceRequest,
+        exact: bool,
+        using_snapshot: bool,
+        profile: super::profile::DecodeProfile,
+    ) -> Result<(), String> {
+        self.reset_core();
+        let filter = if using_snapshot {
+            String::new()
+        } else {
+            source.transforms.filter(source.hdr, source.size)
+        };
+        let core = PreviewCore::new(
+            root,
+            &filter,
+            &source.vid,
+            source.seconds,
+            exact,
+            profile.backend(),
+            source.size,
+        )?;
+        core.set_property("video-rotate", &source.transforms.rotation)?;
+        if !source.transforms.crop.is_empty() {
+            core.set_property("video-crop", &source.transforms.crop)?;
+        }
+        let path = source.path.to_str().ok_or("THUMBNAIL_PATH")?;
+        core.command(&["loadfile", path])?;
+        self.core = Some(core);
+        self.loading = Some((source.seconds, exact));
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn extract_until(
+        &mut self,
+        root: &Path,
+        source: &SourceRequest,
+        exact: bool,
+        output: Output,
+        cancelled: &AtomicBool,
+        stopped: &AtomicBool,
+        deadline: Instant,
+        permit: ReadPermit<'_>,
+    ) -> Result<(Vec<u8>, f64), String> {
+        if cancelled.load(Ordering::Acquire)
+            || stopped.load(Ordering::Acquire)
+            || permit.is_some_and(|allowed| !allowed())
+        {
+            return Err("THUMBNAIL_CANCELLED".into());
+        }
+        if Instant::now() >= deadline {
+            return Err("THUMBNAIL_MPV_TIMEOUT".into());
+        }
+        let identity = self.adopt_identity(source);
+        let live = matches!(output, Output::Live);
+        if live {
+            if let Some(bytes) = self.coarse.get(source.seconds, exact) {
+                self.last_used = Some(Instant::now());
+                return Ok((bytes, source.seconds));
+            }
+        }
+        let (using_snapshot, profile) = self.plan(source);
         self.last_used = Some(Instant::now());
+        let mut loading_failed = false;
         let result = (|| {
-            if fresh {
-                self.core = None;
-                let filter = if using_snapshot {
-                    String::new()
-                } else {
-                    source.transforms.filter(source.hdr)
-                };
-                self.core = Some(PreviewCore::new(
-                    root,
-                    &filter,
-                    &source.vid,
-                    source.seconds,
-                    exact,
-                    profile.backend(),
-                )?);
-                self.core
-                    .as_ref()
-                    .unwrap()
-                    .set_property("video-rotate", &source.transforms.rotation)?;
-                if !source.transforms.crop.is_empty() {
-                    self.core
-                        .as_ref()
-                        .unwrap()
-                        .set_property("video-crop", &source.transforms.crop)?;
-                }
-                let path = source.path.to_str().ok_or("THUMBNAIL_PATH")?;
-                self.core.as_ref().unwrap().command(&["loadfile", path])?;
+            if self.core.is_none() {
+                self.open(root, source, exact, using_snapshot, profile)?;
             }
             let core = self.core.as_ref().ok_or("THUMBNAIL_MPV_UNAVAILABLE")?;
-            let mut frame = || {
+            let encode = |core: &PreviewCore| match output {
+                Output::Live => core.jpeg(),
+                Output::Tile(size) => core.jpeg_sized(size),
+            };
+            let frame = |coarse: &mut super::coarse_cache::CoarseCache| {
+                if permit.is_some_and(|allowed| !allowed()) {
+                    return Err("THUMBNAIL_CANCELLED".into());
+                }
                 let actual = verified_position(core, source.seconds, exact)?;
                 // Forward hovers can land on the same keyframe beyond the last
                 // proven interval. Seek proves that bound, but downloading and
                 // encoding the identical frame again would waste CPU/GPU work.
-                if !exact {
-                    if let Some(bytes) = self.coarse.get(actual, true) {
-                        return Ok(bytes);
+                if live && !exact {
+                    if let Some(bytes) = coarse.get(actual, true) {
+                        return Ok((bytes, actual));
                     }
                 }
                 if using_snapshot {
                     core.validate_snapshot()?;
                 }
-                core.jpeg()
+                encode(core).map(|bytes| (bytes, actual))
             };
-            if fresh {
-                wait_restart(core, cancelled, stopped, None, deadline)?;
-                return frame();
+            if let Some(opened_at) = self.loading {
+                // Загрузка файла могла начаться в отменённом запросе или при
+                // прогреве. Сначала дожидаемся её PLAYBACK_RESTART: тогда её
+                // позднее событие уже не будет принято за ответ на наш seek.
+                if let Err(error) = wait_restart(core, cancelled, stopped, None, deadline, permit) {
+                    loading_failed = error == "THUMBNAIL_MPV_END";
+                    return Err(error);
+                }
+                self.loading = None;
+                if opened_at == (source.seconds, exact) {
+                    return frame(&mut self.coarse);
+                }
             }
-            {
-                while core.event()? != 0 {}
-                core.command(&[
-                    "seek",
-                    &format!("{:.3}", source.seconds),
-                    if exact {
-                        "absolute+exact"
-                    } else {
-                        "absolute+keyframes"
-                    },
-                ])?;
-            }
+            while core.event()? != 0 {}
+            core.command(&[
+                "seek",
+                &format!("{:.3}", source.seconds),
+                if exact {
+                    "absolute+exact"
+                } else {
+                    "absolute+keyframes"
+                },
+            ])?;
             wait_restart(
                 core,
                 cancelled,
                 stopped,
                 Some((source.seconds, exact)),
                 deadline,
+                permit,
             )?;
-            frame()
+            frame(&mut self.coarse)
         })();
-        if !exact {
-            if let Ok(bytes) = &result {
-                if let Some(actual) = self.core.as_ref().and_then(|core| core.position().ok()) {
-                    self.coarse.insert(actual, source.seconds, bytes);
-                }
+        if live && !exact {
+            if let Ok((bytes, actual)) = &result {
+                self.coarse.insert(*actual, source.seconds, bytes);
             }
         }
         if let Err(err) = &result {
-            // Контекст декодера уничтожается только если сбой произошёл на этапе
-            // первоначальной загрузки файла (fresh == true), либо при неисправимой ошибке декодера.
-            // При штатной отмене сика, таймауте или несовпадении позиции контекст сохраняется живым!
-            let is_fatal = fresh
-                || (err != "THUMBNAIL_CANCELLED"
-                    && err != "THUMBNAIL_MPV_TIMEOUT"
-                    && err != "THUMBNAIL_MPV_POSITION"
-                    && err != "THUMBNAIL_MPV_END");
-            if is_fatal {
-                self.core = None;
+            // Отмена, таймаут и несовпадение позиции — штатные исходы: контекст
+            // сохраняется, в том числе если загрузка файла ещё не закончилась.
+            // Уничтожается он только при неисправимой ошибке или если сам файл
+            // не загрузился.
+            let recoverable = matches!(
+                err.as_str(),
+                "THUMBNAIL_CANCELLED"
+                    | "THUMBNAIL_MPV_TIMEOUT"
+                    | "THUMBNAIL_MPV_POSITION"
+                    | "THUMBNAIL_MPV_END"
+            ) && !loading_failed;
+            if !recoverable {
+                self.reset_core();
                 if using_snapshot && err != "THUMBNAIL_CANCELLED" && err != "THUMBNAIL_MPV_TIMEOUT"
                 {
                     #[cfg(test)]
                     eprintln!("Snapshot fallback: {:?}", err);
                     self.snapshot_failed_identity = Some(identity);
-                    return self.extract_until(root, source, exact, cancelled, stopped, deadline);
+                    return self.extract_until(
+                        root, source, exact, output, cancelled, stopped, deadline, permit,
+                    );
                 }
             }
         }
@@ -694,10 +1028,14 @@ fn wait_restart(
     stopped: &AtomicBool,
     target: Option<(f64, bool)>,
     deadline: Instant,
+    permit: ReadPermit<'_>,
 ) -> Result<(), String> {
     let mut seeking = target.is_none();
     loop {
-        if cancelled.load(Ordering::Acquire) || stopped.load(Ordering::Acquire) {
+        if cancelled.load(Ordering::Acquire)
+            || stopped.load(Ordering::Acquire)
+            || permit.is_some_and(|allowed| !allowed())
+        {
             return Err("THUMBNAIL_CANCELLED".into());
         }
         if Instant::now() >= deadline {
@@ -706,6 +1044,11 @@ fn wait_restart(
         match core.wait_event(0.01)? {
             20 => seeking = true,
             21 if seeking => {
+                // An older seek may restart while the replacement is already
+                // queued: time-pos can name the new target before its frame.
+                if core.seeking()? {
+                    continue;
+                }
                 if let Some((requested, exact)) = target {
                     if let Ok(actual) = core.position() {
                         if exact {

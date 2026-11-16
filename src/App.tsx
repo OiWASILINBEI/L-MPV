@@ -1,3 +1,4 @@
+import { toggleAmbientMode } from "./utils/ambientPreviewQueue";
 import { upscaleErrorMessage } from "./utils/upscaleCompatibility";
 import {
   useState,
@@ -1000,7 +1001,7 @@ function App() {
         break;
       case "toggleAmbient":
         try {
-          const res = normalizeAmbientSettings(await invoke<unknown>("toggle_ambient_mode"));
+          const res = normalizeAmbientSettings(await toggleAmbientMode());
           const labels: Record<string, string> = {
             off: dict.settings.cmenuUI.ambientOff,
             blur: dict.settings.cmenuUI.ambientBlur,
@@ -1287,8 +1288,6 @@ function App() {
     [executeAction]
   );
 
-  // ─── Перетаскивание окна за видеополотно реализовано в src/zh-cn/drag.ts ───
-
   useEffect(() => {
     const updateHotkeys = () => setHotkeys(getCustomHotkeys());
     window.addEventListener("l-mpv-settings-changed", updateHotkeys);
@@ -1300,6 +1299,7 @@ function App() {
     const handleKeyDown = async (e: KeyboardEvent) => {
       const target = e.target instanceof HTMLElement ? e.target : null;
       if (target?.closest(".color-picker-modal")) return;
+      if (target?.closest(".navigation-popover, .saved-playlists__source-trigger")) return;
 
       const isSlider = target?.getAttribute("role") === "slider" && !target?.closest(".timeline");
       const isEditing = target instanceof HTMLInputElement

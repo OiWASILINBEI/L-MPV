@@ -1,3 +1,4 @@
+import { saveAmbientSettings } from "../../utils/ambientPreviewQueue";
 import { useEffect, useLayoutEffect, useCallback, useRef, useState, useMemo } from "react";
 import { usePlayerState } from "../../contexts/PlayerStateContext";
 import { useTranslation } from "../../i18n/LanguageContext";
@@ -473,7 +474,7 @@ export function ContextMenu({
     try {
       const cfg = await invoke<unknown>("get_ambient_settings");
       const updated = normalizeAmbientSettings({ ...normalizeAmbientSettings(cfg), mode });
-      await invoke("set_ambient_settings", { settings: updated });
+      await saveAmbientSettings(updated);
       setAmbientMode(updated.mode);
       const labels: Record<AmbientMode, string> = {
         off: dict.settings.cmenuUI.ambientOff,

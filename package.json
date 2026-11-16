@@ -1,7 +1,7 @@
 {
   "name": "l-mpv",
   "private": true,
-  "version": "2.7.3",
+  "version": "2.7.4",
   "description": "L-MPV — Modern & Portable Media Player",
   "license": "GPL-3.0-or-later",
   "type": "module",
@@ -30,6 +30,6 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^4.6.0",
     "typescript": "~5.9.3",
-    "vite": "^7.0.4"
+    "vite": "^7.3.8"
   }
 }

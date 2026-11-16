@@ -75,6 +75,7 @@ export interface TranslationDict {
   // ─── Плейлист (PlaylistDrawer) ─────────────────────────────────
   playlist: {
     title: string;
+    tabsLabel: string;
     search: string;
     clearSearch: string;
     close: string;
@@ -85,6 +86,32 @@ export interface TranslationDict {
     nothingFoundDesc: string;
     trackBadge: (current: number, total: number) => string;
     resizeHandle: string;
+    pin: string;
+    unpin: string;
+    movePanel: string;
+  };
+  explorer: {
+    options: string;
+    playableOnly: string;
+    title: string;
+    search: string;
+    parent: string;
+    pickFolder: string;
+    loading: string;
+    empty: string;
+    needMedia: string;
+    openError: string;
+  };
+
+  savedPlaylist: {
+    newList: string;
+    dropUnsupported: string;
+    dropBusy: string;
+    source: string; currentFolder: string; create: string; actions: string; saveFolder: string;
+    rename: string; delete: string; importList: string; exportList: string; name: string;
+    save: string; cancel: string; deleteConfirm: string; addFiles: string; mediaFiles: string;
+    moveUp: string; moveDown: string; remove: string; loading: string; saving: string;
+    empty: string; retry: string; playHint: string; count: (count: number) => string; error: (error: string) => string;
   };
 
   // ─── Titlebar ──────────────────────────────────────────────────
@@ -799,6 +826,35 @@ export interface TranslationDict {
       statusSupported: string;
       statusNotSupported: string;
       noAiEngines: string;
+      healthTitle: string;
+      healthEngine: string;
+      healthAi: string;
+      healthGpu: string;
+      healthIntegration: string;
+      healthOk: string;
+      healthCheck: string;
+      healthNoRuntime: string;
+      healthDiskLow: string;
+      webview2Title: string;
+      osBuildTitle: string;
+      diskTitle: string;
+      diskFree: (freeMb: number, totalMb: number) => string;
+      fontsTitle: string;
+      fontsValue: (builtin: number, custom: number) => string;
+      exeWritableOk: string;
+      exeWritableNo: string;
+      btnOpenFolder: string;
+      btnCopyPath: string;
+      pathCopied: string;
+      pathActionError: (error: string) => string;
+      btnDownloadReport: string;
+      btnCopyJson: string;
+      logFilterAll: string;
+      logFilterOk: string;
+      logFilterWarn: string;
+      logFilterError: string;
+      btnClearLog: string;
+      btnOpenCacheFolder: string;
     };
     contextMenuConfig: {
       cmenuConfigTitle: string;

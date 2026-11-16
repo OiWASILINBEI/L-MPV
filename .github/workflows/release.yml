@@ -164,11 +164,10 @@ jobs:
           Copy-Item "$assetRoot/config/script-assets/*" -Destination "Portable-L-MPV/config/script-assets/" -Recurse -Force
           Write-Host "Lua 插件打包完成。"
 
-          # 根据勾选项确定需要单独上传的组件（tag 推送时全部上传）
-          $isTagPush = ("${{ github.event_name }}" -eq "push")
-          $includeFfmpeg = $isTagPush -or ("${{ github.event.inputs.include_ffmpeg }}" -eq "true")
-          $includeMediainfo = $isTagPush -or ("${{ github.event.inputs.include_mediainfo }}" -eq "true")
-          $includeLibmpv = $isTagPush -or ("${{ github.event.inputs.include_libmpv }}" -eq "true")
+          # 根据勾选项确定需要单独上传的组件
+          $includeFfmpeg = ("${{ github.event.inputs.include_ffmpeg }}" -eq "true")
+          $includeMediainfo = ("${{ github.event.inputs.include_mediainfo }}" -eq "true")
+          $includeLibmpv = ("${{ github.event.inputs.include_libmpv }}" -eq "true")
 
           # 校验编译出的 l-mpv.exe 内含当前 libmpv-2.dll 的 BLAKE3 哈希
           Push-Location src-tauri

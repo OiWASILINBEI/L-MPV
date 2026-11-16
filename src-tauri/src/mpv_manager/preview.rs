@@ -44,6 +44,7 @@ pub(crate) struct PreviewCore {
     terminate: Terminate,
     backend: PreviewBackend,
     encoder: Mutex<super::preview_image::FrameEncoder>,
+    size: (u32, u32),
 }
 
 impl PreviewCore {
@@ -57,6 +58,7 @@ impl PreviewCore {
         start: f64,
         exact: bool,
         backend: PreviewBackend,
+        size: (u32, u32),
     ) -> Result<Self, String> {
         let vf = if matches!(backend, PreviewBackend::Snapshot) {
             String::new()
@@ -123,13 +125,14 @@ impl PreviewCore {
         } else {
             options
         };
-        Self::with_options(root, &options, backend)
+        Self::with_options(root, &options, backend, size)
     }
 
     fn with_options(
         root: &Path,
         options: &[(String, String)],
         backend: PreviewBackend,
+        size: (u32, u32),
     ) -> Result<Self, String> {
         // SAFETY: the API owns the loaded library; the manager owns the new handle
         // immediately, including all option/initialization failure paths.
@@ -143,6 +146,7 @@ impl PreviewCore {
             MpvManager {
                 handle: Mutex::new(handle),
                 api,
+                track_cache: Mutex::new(None),
             }
         };
         for (key, value) in options {
@@ -196,6 +200,7 @@ impl PreviewCore {
             terminate,
             backend,
             encoder: Mutex::new(super::preview_image::FrameEncoder::default()),
+            size,
         })
     }
 
@@ -243,6 +248,10 @@ impl PreviewCore {
         self.manager().get_property_double("time-pos")
     }
 
+    pub fn seeking(&self) -> Result<bool, String> {
+        self.manager().get_property_bool("seeking")
+    }
+
     pub fn frame_tolerance(&self) -> f64 {
         self.manager()
             .get_property_double("estimated-vf-fps")
@@ -277,6 +286,11 @@ impl PreviewCore {
     }
 
     pub fn jpeg(&self) -> Result<Vec<u8>, String> {
+        self.jpeg_sized(self.size)
+    }
+
+    /// Кодирует текущий кадр в заданный размер (кадры раскадровки меньше живых).
+    pub fn jpeg_sized(&self, size: (u32, u32)) -> Result<Vec<u8>, String> {
         let aspect = if matches!(self.backend, PreviewBackend::Snapshot) {
             self.manager()
                 .get_property_double("video-dec-params/aspect")
@@ -288,7 +302,7 @@ impl PreviewCore {
         self.manager()
             .with_screenshot_raw(|data, width, height, stride| {
                 let stride = usize::try_from(stride).map_err(|_| "THUMBNAIL_MPV_STRIDE")?;
-                encoder.encode(data, width, height, stride, aspect)
+                encoder.encode(data, width, height, stride, aspect, size)
             })
     }
 }

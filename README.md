@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-2.7.3-blueviolet?style=for-the-badge" alt="Version 2.7.3">
+  <img src="https://img.shields.io/badge/Version-2.7.4-blueviolet?style=for-the-badge" alt="Version 2.7.4">
   <a href="https://github.com/Menely/L-MPV/releases"><img src="https://img.shields.io/github/downloads/Menely/L-MPV/total?style=for-the-badge&logo=github&logoColor=white&label=Downloads" alt="Downloads"></a>
   <a href="https://t.me/+_ngzHkrUNZs5YzQ6"><img src="https://img.shields.io/badge/Telegram-Channel-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram Channel"></a>
   <img src="https://img.shields.io/badge/Platform-Windows%20x64-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows">
@@ -52,8 +52,6 @@ The creation and ongoing evolution of **L-MPV** have been made possible thanks t
 - **[mpv-AnimeJaNai](https://github.com/the-database/mpv-AnimeJaNai)** & **[the-database](https://github.com/the-database)** — For the `vf_animejanai` video filter and real-time neural 4K upscaling implementation.
 - **[Tauri](https://tauri.app/)** ([GitHub](https://github.com/tauri-apps/tauri)) — For the lightweight and performant framework powered by Rust and modern web technologies.
 - **[dnd-kit](https://dndkit.com/)** ([GitHub](https://github.com/clauderic/dnd-kit)) — For the flexible and reliable Drag & Drop toolkit for React.
-- **[frame-player](https://github.com/risenxxx/frame-player)** — For the reference approach to timeline frame previews, adapted here with an independent preview worker.
-- **[thumbfast](https://github.com/iiiGerardoiii/thumbfast)** — For the on-demand thumbnail generation approach that inspired the private libmpv preview decoder.
 
 ---
 
@@ -445,6 +443,10 @@ The creation and ongoing evolution of **L-MPV** have been made possible thanks t
 <details>
 <summary><b>📑 Playlist & File Navigation</b></summary>
 
+- **Your own playlists:** Choose the current video's folder or a named collection in the same panel. Create and rename lists, add audio and video from different folders, reorder by dragging or using buttons, and remove entries without deleting files. Edits save automatically; import and export M3U8 to share lists. Selecting a collection only shows its contents; choose a file to play it in that collection's order.
+- **Playlist menus and file drops:** The source selector and actions use popups matching the player's style, with context-specific actions and a dot marking the selected source. Drop multiple video/audio files onto the panel to add them; in folder mode this creates a named collection. Pinning and position survive restarts and WebView cache cleanup; short lists shrink the card while its top stays in place. Explorer's file filter is in its ⋯ menu beside Refresh.
+- **Explorer file filter:** “Playable files only” is enabled by default and shows folders, video, audio and playlists. Turn it off to see images, subtitles and other files too; unsupported files cannot be launched. The preference is stored in portable settings.
+- **Explorer in the side panel:** Playlist and Explorer share the `L` / `P` shortcut and remember the last selected tab. Browse folders and supported media, move to the parent folder, choose a folder and search by name. Browsing leaves playback unchanged; selecting subtitles attaches them to the open media. Mouse Back/Forward buttons navigate folder history while the panel is open. Pin the panel to keep its position and height, then use the header grip to move it vertically. The current media file is marked with a Play icon.
 - **Startup and buffering:** Playback starts without waiting for the entire buffer to fill. Read-ahead helps absorb brief storage slowdowns; if data runs out, the player waits for more and resumes. Background scanning and full heatmap analysis are deferred during file opening and yield to video reads during seeking or low-buffer conditions. Startup speed depends on the file and storage device.
 - **Auto-Playlist with Natural Sort:** Opening a file automatically populates the playlist with all sibling media in the directory, ordered by natural human numerical sorting.
 - **Slide-out Playlist Drawer (`L` / `P`):** Search, file filtering, active track highlighting, and one-click playback switching.
@@ -498,7 +500,7 @@ The creation and ongoing evolution of **L-MPV** have been made possible thanks t
 - **Interactive Stream Filter Tabs (Quick Filter):** Filter tracks (*"All"*, *"General"*, *"Video"*, *"Audio"*, *"Subtitles"*, *"Chapters"*) with informative stream count badges and 6px rounded pills matching the design system.
 - **Collapsible Stream Accordions:** Collapse or expand individual streams or all at once ("Expand/Collapse All"), with auto-expansion during `Ctrl+F` search.
 - **Native Drag-and-Drop:** Drop any media file straight into the open MediaInfo window with a translucent overlay (`FileUp`) for analysis.
-- **Compact overlay (`I`):** Three tabs — Summary, Rendering and Tracks — selected by clicking or pressing `1` / `2` / `3`. Rendering shows process/system CPU and RAM, GPU and VRAM information, decoder, color, display refresh rate and A/V sync. Metric availability depends on the system and file; GPU utilization is not measured. The GPU shown is the adapter with the most dedicated memory and may differ from the one used for playback; VRAM usage is for the L-MPV process, not the whole system. Tracks lets you select audio and subtitles, disable the active track by clicking it again, and jump to chapters. The Summary video bitrate graph is smoothed, may fall back to metadata and includes illustrative fluctuations; it is not a raw packet measurement.
+- **Compact overlay (`I`):** Three tabs — Summary, Rendering and Tracks — selected by clicking or pressing `1` / `2` / `3`. Rendering shows process/system CPU and RAM, GPU and VRAM information, decoder, color, display refresh rate and A/V sync. Metric availability depends on the system and file; GPU utilization is not measured. The GPU shown is the adapter with the most dedicated memory and may differ from the one used for playback; VRAM usage is for the L-MPV process, not the whole system. Tracks lets you select audio and subtitles, disable the active track by clicking it again, and jump to chapters. The Summary video bitrate graph is smoothed, may fall back to metadata; it is not a raw packet measurement.
 - **Productivity Features:** Property search with highlighting (`Ctrl+F`), export to `.txt`, copy to clipboard, and bilingual interface (EN/RU). Action buttons feature clean minimalist vector icons without redundant borders or text.
 
 </details>
