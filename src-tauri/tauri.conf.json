@@ -62,7 +62,14 @@
     "resources": {
       "binaries/libmpv-2.dll": "libmpv-2.dll",
       "binaries/ffmpeg.exe": "ffmpeg.exe",
-      "binaries/mediainfo.dll": "mediainfo.dll"
+      "binaries/mediainfo.dll": "mediainfo.dll",
+      "../bundled/portable-assets/config/scripts": "config/scripts",
+      "../bundled/portable-assets/config/script-modules/startup-logo-bounds.lua": "config/script-modules/startup-logo-bounds.lua",
+      "../bundled/portable-assets/config/script-opts/startup_format_logos.conf": "config/script-opts/startup_format_logos.conf",
+      "../bundled/portable-assets/config/script-opts/stats.conf": "config/script-opts/stats.conf",
+      "../bundled/portable-assets/config/fonts/NotoSansCJK-Bold.ttc": "config/fonts/NotoSansCJK-Bold.ttc",
+      "../bundled/yt-dlp/yt-dlp.exe": "config/yt-dlp.exe",
+      "../bundled/portable-assets/config/script-assets": "config/script-assets"
     },
     "icon": [
       "icons/32x32.png",

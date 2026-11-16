@@ -96,7 +96,7 @@ export function ContextMenu({
   onShowSubtitlesSearch,
   onShowSettings,
 }: ContextMenuProps) {
-  const { dict } = useTranslation();
+  const { dict, locale } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const closeTimerRef = useRef<number | null>(null);
@@ -437,10 +437,11 @@ export function ContextMenu({
     try {
       await invoke("set_speed", { speed });
       setCurrentSpeed(speed);
+      showOsd(dict.osd.speed(`${Math.round(speed * 100) / 100}x`));
     } catch (e) {
       console.error("Ошибка установки скорости воспроизведения:", e);
     }
-  }, []);
+  }, [dict.osd.speed]);
 
   const handleSetFrameMode = useCallback(async (mode: "stretch" | "fit" | "fill") => {
     try {
@@ -463,10 +464,11 @@ export function ContextMenu({
       await invoke("set_rotation", { degrees });
       window.dispatchEvent(new Event("l-mpv-preview-transform-changed"));
       setCurrentRotation(degrees);
+      showOsd(dict.osd.rotation(degrees));
     } catch (e) {
       console.error("Ошибка установки поворота видео:", e);
     }
-  }, []);
+  }, [dict.osd.rotation]);
 
   const handleSetAmbientMode = useCallback(async (mode: AmbientMode) => {
     try {
@@ -526,8 +528,9 @@ export function ContextMenu({
 
   const handleToggleShuffle = useCallback(() => {
     invoke("toggle_shuffle").catch(console.error);
+    showOsd(dict.controls.shuffle, { durationMs: 1200 });
     handleClose();
-  }, [handleClose]);
+  }, [handleClose, dict.controls.shuffle]);
 
   const handleClearRecent = useCallback(() => {
     clearRecentFiles();
@@ -674,6 +677,7 @@ export function ContextMenu({
     () =>
       buildContextMenuItems({
         dict,
+        locale,
         menuLayout,
         recentFiles,
         audioTracks,

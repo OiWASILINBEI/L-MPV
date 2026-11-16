@@ -356,6 +356,43 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
                   {dict.settings.general.languageEn}
                 </span>
               </button>
+              <button
+                type="button"
+                className={`compact-segment-btn ${locale === "zh" ? "compact-segment-btn--active" : ""}`}
+                style={{
+                  height: 38,
+                  padding: "0 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "flex-start",
+                  gap: "var(--space-4)",
+                }}
+                onClick={() => setLocale("zh" as Locale)}
+                >
+                <span
+                  style={{
+                    fontSize: "var(--fs-2xs)",
+                    fontWeight: 700,
+                    letterSpacing: "0.5px",
+                    padding: "2px 5px",
+                    borderRadius: "var(--radius-xs)",
+                    background: locale === "zh" ? "var(--accent)" : "rgba(255, 255, 255, 0.08)",
+                    color: locale === "zh" ? "var(--on-accent)" : "var(--text-muted)",
+                    lineHeight: 1,
+                  }}
+                  >
+                  中
+                </span>
+                <span
+                  style={{
+                    fontSize: "var(--fs-sm)",
+                    fontWeight: 600,
+                    color: locale === "zh" ? "var(--text-primary)" : "var(--text-secondary)",
+                  }}
+                  >
+                  {dict.settings.general.languageZh}
+                </span>
+              </button>
             </div>
           </div>
         </div>

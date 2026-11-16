@@ -24,6 +24,8 @@ import { PlayerControls } from "./components/player/PlayerControls";
 import { ContextMenu } from "./components/player/ContextMenu";
 import { PlaylistDrawer } from "./components/player/PlaylistDrawer";
 import { SeekIndicator } from "./components/player/SeekIndicator";
+import { formatSpeedValue } from "./components/player/controls";
+import { cleanMediaName } from "./utils/mediaNameUtils";
 import { VolumeIndicator } from "./components/player/VolumeIndicator";
 import { triggerVolumeFeedback } from "./utils/volumeFeedback";
 import { UpdateInfo } from "./components/modals/UpdateModal";
@@ -185,12 +187,51 @@ function App() {
     };
   }, [showSettings, settingsStyle]);
 
-  const mediaTitle = mediaInfo?.path ? mediaInfo.path.split(/[/\\]/).pop() || "" : "";
+  /**
+   * 只有网址播放才需要用 mpv 的 media-title（yt-dlp 解析出的真实视频名）。
+   * 本地文件一律用文件名本身：mpv 的 media-title 对本地文件会取容器内嵌标题，
+   * 常常是被截短的名字、或者没有后缀，导致和媒体信息面板对不上。
+   */
+  const isUrlPlayback = /^https?:\/\//i.test(mediaInfo?.path || "");
+  const [mediaTitleOverride, setMediaTitleOverride] = useState("");
+  useEffect(() => {
+    const p = mediaInfo?.path || "";
+    if (!isUrlPlayback) {
+      setMediaTitleOverride("");
+      return;
+    }
+    // URL playback: yt-dlp fills media-title asynchronously, poll until resolved.
+    let cancelled = false;
+    let attempts = 0;
+    const poll = async () => {
+      while (!cancelled && attempts < 20) {
+        attempts++;
+        try {
+          const t = await invoke<string>("mpv_get_property_string", { name: "media-title" });
+          if (cancelled) return;
+          if (t && t !== p) {
+            setMediaTitleOverride(cleanMediaName(t));
+            return;
+          }
+        } catch (_) {}
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    };
+    poll();
+    return () => { cancelled = true; };
+  }, [mediaInfo?.path, isUrlPlayback]);
+
+  // Titlebar and media-info panel share cleanMediaName so both always match.
+  const fileNameFromPath = mediaInfo?.path ? cleanMediaName(mediaInfo.path) : "";
+  const mediaTitle = isUrlPlayback
+    ? mediaTitleOverride || fileNameFromPath
+    : fileNameFromPath;
 
   const clickTimerRef = useRef<number | null>(null);
   const hasMediaRef = useRef(hasMedia);
   const isSteppingRef = useRef(false);
   const videoZoomRef = useRef<number>(0);
+  const videoRotationRef = useRef<number>(0);
   const videoPanXRef = useRef<number>(0);
   const videoPanYRef = useRef<number>(0);
   const rafIdRef = useRef<number | null>(null);
@@ -199,6 +240,7 @@ function App() {
   useEffect(() => {
     hasMediaRef.current = hasMedia;
     videoZoomRef.current = 0;
+    videoRotationRef.current = 0;
     videoPanXRef.current = 0;
     videoPanYRef.current = 0;
   }, [hasMedia]);
@@ -684,8 +726,10 @@ function App() {
       case "togglePause":
         curProlongControlsIfActive();
         if (curHasMedia) {
+          const wasPaused = Boolean(curMediaInfo?.paused);
           try {
             await curTogglePause();
+            triggerOsd(wasPaused ? dict.controls.play : dict.controls.pause, 900);
           } catch (e) {
             console.error(e);
           }
@@ -721,6 +765,7 @@ function App() {
         curProlongControlsIfActive();
         const raw = localStorage.getItem('l-mpv-skip-opening-seconds');
         const seconds = Number(raw || 90);
+        triggerSeekIndicator("right", seconds);
         await curSeekBy(seconds);
         break;
       }
@@ -747,9 +792,12 @@ function App() {
           triggerVolumeFeedback(volume);
         }
         break;
-      case "fullscreen":
-        curToggleFullscreen();
+      case "fullscreen": {
+        const wasFullscreen = latestRef.current.isFullscreen;
+        await curToggleFullscreen();
+        triggerOsd(wasFullscreen ? dict.controls.exitFullscreen : dict.controls.fullscreen, 1200);
         break;
+      }
       case "frameBack":
         if (isSteppingRef.current) return;
         isSteppingRef.current = true;
@@ -846,21 +894,21 @@ function App() {
         break;
       }
       case "rotateVideo": {
+        const nextRot = (videoRotationRef.current + 90) % 360;
+        videoRotationRef.current = nextRot;
         try {
-          const curRot = (mediaInfo as any)?.rotation || 0;
-          const nextRot = (curRot + 90) % 360;
           await invoke("set_rotation", { degrees: nextRot });
           window.dispatchEvent(new Event("l-mpv-preview-transform-changed"));
-          triggerOsd(dict.osd.rotation(nextRot), 1500);
         } catch (e) {
           console.error(e);
         }
+        triggerOsd(dict.osd.rotation(nextRot), 1500);
         break;
       }
       case "toggleLanguage": {
-        const nextLocale: Locale = curLocale === "ru" ? "en" : "ru";
+        const nextLocale: Locale = curLocale === "ru" ? "en" : curLocale === "en" ? "zh" : "ru";
         saveLocale(nextLocale);
-        const langName = nextLocale === "ru" ? "Русский" : "English";
+        const langName = nextLocale === "ru" ? "Русский" : nextLocale === "zh" ? "中文" : "English";
         const nextDict = getDict(nextLocale);
         const osdMsg = nextDict.osd.languageSwitched(langName);
         triggerOsd(osdMsg, 1500);
@@ -898,34 +946,53 @@ function App() {
         window.dispatchEvent(new CustomEvent("l-mpv-toggle-popover", { detail: { type: "sub" } }));
         break;
       case "playlistPrev":
-        invoke("playlist_prev").catch(console.error);
+      case "playlistNext": {
+        const goNext = actionId === "playlistNext";
+        invoke(goNext ? "playlist_next" : "playlist_prev").catch(console.error);
+        // Имя нового файла приходит асинхронно — показываем его после переключения
+        window.setTimeout(() => {
+          const path = latestRef.current.mediaInfo?.path;
+          if (path) {
+            triggerOsd(dict.osd.nowPlaying(path.split(/[/\\]/).pop() || path), 1800);
+          }
+        }, 700);
         break;
-      case "playlistNext":
-        invoke("playlist_next").catch(console.error);
-        break;
+      }
       case "speedUp":
         if (curMediaInfo) {
           const newSpeed = Math.min(4.0, (curMediaInfo.speed || 1.0) + 0.25);
           invoke("set_speed", { speed: newSpeed }).catch(console.error);
+          triggerOsd(dict.osd.speed(formatSpeedValue(newSpeed)), 1200);
         }
         break;
       case "speedDown":
         if (curMediaInfo) {
           const newSpeed = Math.max(0.25, (curMediaInfo.speed || 1.0) - 0.25);
           invoke("set_speed", { speed: newSpeed }).catch(console.error);
+          triggerOsd(dict.osd.speed(formatSpeedValue(newSpeed)), 1200);
         }
         break;
       case "speedReset":
-        invoke("set_speed", { speed: 1.0 }).catch(console.error);
+        if (curMediaInfo) {
+          invoke("set_speed", { speed: 1.0 }).catch(console.error);
+          triggerOsd(dict.osd.speed(formatSpeedValue(1.0)), 1200);
+        }
         break;
       case "toggleShuffle":
-        invoke("toggle_shuffle").catch(console.error);
+        try {
+          await invoke("toggle_shuffle");
+          triggerOsd(dict.controls.shuffle, 1200);
+        } catch (e) { console.error(e); }
         break;
       case "alwaysOnTop":
         try {
           const appWindow = getCurrentWindow();
           const current = await appWindow.isAlwaysOnTop();
           await appWindow.setAlwaysOnTop(!current);
+          triggerOsd(
+            `${dict.controls.alwaysOnTop}: ${current ? dict.osd.disabled : dict.osd.enabled}`,
+            1200,
+          );
           window.dispatchEvent(new CustomEvent("l-mpv-action", { detail: actionId }));
         } catch (e) { console.error(e); }
         break;
@@ -972,8 +1039,8 @@ function App() {
             const modelIndex = status?.models?.findIndex((m) => m.slot === slot || m.filename === selectedModel);
             const modelNumber = modelIndex !== undefined && modelIndex !== -1 ? modelIndex + 1 : 1;
             const activeModel = status?.models?.find((m) => m.slot === slot || m.filename === selectedModel);
-            const rawName = activeModel?.display_name || (selectedModel ? selectedModel.replace(/\.onnx$/i, "") : (curLocale === "en" ? `Slot #${slot}` : `Слот #${slot}`));
-            const modelName = isHideModelNames ? (curLocale === "en" ? `Model #${modelNumber}` : `Модель #${modelNumber}`) : rawName;
+            const rawName = activeModel?.display_name || (selectedModel ? selectedModel.replace(/\.onnx$/i, "") : (curLocale === "en" ? `Slot #${slot}` : curLocale === "zh" ? `槽位 #${slot}` : `Слот #${slot}`));
+            const modelName = isHideModelNames ? (curLocale === "en" ? `Model #${modelNumber}` : curLocale === "zh" ? `模型 #${modelNumber}` : `Модель #${modelNumber}`) : rawName;
             
             let backendDesc = backend;
             if (backend === "TensorRT") {
@@ -989,6 +1056,8 @@ function App() {
               const fpsText = mediaInfo.fps ? ` @ ${mediaInfo.fps.toFixed(2)} fps` : "";
               videoStats = curLocale === "en"
                 ? `\nVideo: ${mediaInfo.width}×${mediaInfo.height}${fpsText} ➔ 4K UHD`
+                : curLocale === "zh"
+                ? `\n视频：${mediaInfo.width}×${mediaInfo.height}${fpsText} ➔ 4K UHD`
                 : `\nВидео: ${mediaInfo.width}×${mediaInfo.height}${fpsText} ➔ 4K UHD`;
             }
 
@@ -1086,7 +1155,7 @@ function App() {
             localStorage.setItem("l-mpv-upscale-selected-model", targetModel.filename);
 
             const isHideModelNames = localStorage.getItem("l-mpv-hide-model-names") === "true";
-            const modelTitle = isHideModelNames ? (curLocale === "en" ? `Model #${index + 1}` : `Модель #${index + 1}`) : targetModel.display_name;
+            const modelTitle = isHideModelNames ? (curLocale === "en" ? `Model #${index + 1}` : curLocale === "zh" ? `模型 #${index + 1}` : `Модель #${index + 1}`) : targetModel.display_name;
 
             triggerOsd(dict.osd.upscaleModel(modelTitle), 2000);
 
@@ -1106,6 +1175,7 @@ function App() {
   const handleVideoClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.button !== 0) return;
+      // Клик, завершивший перетаскивание окна, гасится в src/zh-cn/drag.ts
       closeContextMenu();
       if (latestRef.current.isPlaylistOpen) {
         latestRef.current.setIsPlaylistOpen(false);
@@ -1243,6 +1313,36 @@ function App() {
       const isButton = target instanceof HTMLButtonElement
         || target?.getAttribute("role") === "button";
       if (isButton && (e.code === "Space" || e.code === "Enter" || e.key === " " || e.key === "Enter")) {
+        return;
+      }
+
+      // Ctrl+V：剪贴板是 http(s) 链接则直接播放
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.code === "KeyV") {
+        navigator.clipboard.readText().then((text) => {
+          const url = (text || "").trim();
+          if (/^https?:\/\/\S+$/i.test(url)) {
+            invoke("open_file", { path: url }).catch(() => {});
+          }
+        }).catch(() => {});
+        return;
+      }
+
+      // 数字键 1~4：stats 面板翻页（mpv 键盘输入被禁用，由前端转发）
+      // 4 映射到第 5 页（轨道信息），原第 4 页（按键绑定）不绑定数字键
+      if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && /^[1-4]$/.test(e.key)) {
+        const page = e.key === "4" ? "5" : e.key;
+        invoke("mpv_command", {
+          command: `script-binding stats/display-page-${page}-toggle`,
+        }).catch(() => {});
+        return;
+      }
+
+      // TAB：开关 stats 面板（内置绑定，L-MPV 设置界面不提供 Tab 快捷键）
+      if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && e.code === "Tab") {
+        e.preventDefault();
+        invoke("mpv_command", {
+          command: "script-binding stats/display-stats-toggle",
+        }).catch(() => {});
         return;
       }
 

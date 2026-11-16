@@ -13,7 +13,7 @@ import {
   Languages,
 } from "lucide-react";
 import { usePlayerState } from "../../contexts/PlayerStateContext";
-import { parseMediaInfoLines } from "../../utils/mediaInfoParser";
+import { parseMediaInfoLines, MediaInfoLang } from "../../utils/mediaInfoParser";
 import { useTranslation } from "../../i18n/LanguageContext";
 import {
   CategoryKey,
@@ -44,7 +44,7 @@ export function DetailedMediaInfoModal({
   onClose,
   filePath,
 }: DetailedMediaInfoModalProps) {
-  const { dict } = useTranslation();
+  const { dict, locale } = useTranslation();
   const { mediaInfo } = usePlayerState();
   const currentPath = filePath || mediaInfo?.path;
   const fileName = useMemo(() => {
@@ -56,7 +56,7 @@ export function DetailedMediaInfoModal({
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [useRussian, setUseRussian] = useState<boolean>(true);
+  const [lang, setLang] = useState<MediaInfoLang>(() => locale);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [copied, setCopied] = useState<boolean>(false);
   const [copiedSectionId, setCopiedSectionId] = useState<string | null>(null);
@@ -193,13 +193,13 @@ export function DetailedMediaInfoModal({
   // Базовый парсинг и структурирование отчёта по секциям
   const baseReport = useMemo(() => {
     if (!data?.text) return { rawText: "", cleanText: "", lines: [], sections: [] };
-    return parseMediaInfoLines(data.text, useRussian);
-  }, [data?.text, useRussian]);
+    return parseMediaInfoLines(data.text, lang);
+  }, [data?.text, lang]);
 
   // Список доступных интерактивных чипов-вкладок
   const categoryTabs = useMemo(() => {
-    return buildCategoryTabs(baseReport.sections, useRussian);
-  }, [baseReport.sections, useRussian]);
+    return buildCategoryTabs(baseReport.sections, lang);
+  }, [baseReport.sections, lang]);
 
   // Фильтрация и подсветка поиска по свойствам категорий
   const displaySections = useMemo(() => {
@@ -341,18 +341,18 @@ export function DetailedMediaInfoModal({
         </div>
 
         <div className="mediainfo-floating-window__actions">
-          {/* Переключение языка (RU / EN) */}
+          {/* Переключение языка (RU / EN / 中文) */}
           <button
             type="button"
-            onClick={() => setUseRussian(!useRussian)}
+            onClick={() => setLang((p) => (p === "ru" ? "en" : p === "en" ? "zh" : "ru"))}
             className={`mediainfo-floating-window__btn ${
-              useRussian ? "mediainfo-floating-window__btn--active" : ""
+              lang !== "en" ? "mediainfo-floating-window__btn--active" : ""
             }`}
-            title={useRussian ? dict.detailedMediaInfoModal.langTooltipRu : dict.detailedMediaInfoModal.langTooltipEn}
-            aria-label={useRussian ? dict.detailedMediaInfoModal.langTooltipRu : dict.detailedMediaInfoModal.langTooltipEn}
+            title={lang === "ru" ? dict.detailedMediaInfoModal.langTooltipRu : lang === "zh" ? dict.detailedMediaInfoModal.langTooltipZh : dict.detailedMediaInfoModal.langTooltipEn}
+            aria-label={lang === "ru" ? dict.detailedMediaInfoModal.langTooltipRu : lang === "zh" ? dict.detailedMediaInfoModal.langTooltipZh : dict.detailedMediaInfoModal.langTooltipEn}
             >
             <Languages size={14} />
-            <span style={{ fontSize: "var(--fs-2xs)", fontWeight: 600 }}>{useRussian ? "RU" : "EN"}</span>
+            <span style={{ fontSize: "var(--fs-2xs)", fontWeight: 600 }}>{lang === "ru" ? "RU" : lang === "zh" ? "中文" : "EN"}</span>
           </button>
 
           {/* Копировать всё */}
@@ -438,7 +438,7 @@ export function DetailedMediaInfoModal({
           onSelectCategory={setActiveCategory}
           areAllCollapsed={areAllCollapsed}
           onToggleCollapseAll={toggleCollapseAll}
-          useRussian={useRussian}
+          lang={lang}
           style={{ padding: "4px 12px" }}
         />
       )}
@@ -466,7 +466,7 @@ export function DetailedMediaInfoModal({
             onToggleSection={toggleSection}
             onCopySection={handleCopySection}
             copiedSectionId={copiedSectionId}
-            useRussian={useRussian}
+            lang={lang}
           />
         )}
       </div>

@@ -43,7 +43,7 @@ import type {
 } from "../heatmap";
 import { BUILT_IN_PRESETS } from "../../../utils/presetsUtils";
 import { TIME_POSITION_OPTIONS } from "../../../utils/timePositionUtils";
-import { TIME_FORMAT_OPTIONS } from "../../../utils/timeFormatUtils";
+import { getTimeFormatOptions } from "../../../utils/timeFormatUtils";
 import { CONTROL_BAR_STYLE_OPTIONS } from "../../../utils/controlBarStyleUtils";
 import { getKeyDisplay } from "../../../utils/hotkeyUtils";
 import { truncateMiddle } from "../../../utils/textUtils";
@@ -117,6 +117,7 @@ export const STATIC_ICONS = {
 
 export interface ContextMenuBuilderParams {
   dict: TranslationDict;
+  locale: string;
   menuLayout: LayoutEntry[];
   recentFiles: RecentFile[];
   audioTracks: TrackInfo[];
@@ -199,6 +200,7 @@ function normalizeMenuItems(rawItems: MenuItem[]): MenuItem[] {
 export function buildContextMenuItems(params: ContextMenuBuilderParams): MenuItem[] {
   const {
     dict,
+    locale,
     menuLayout,
     recentFiles,
     audioTracks,
@@ -270,7 +272,7 @@ export function buildContextMenuItems(params: ContextMenuBuilderParams): MenuIte
           type: "item",
           icon: STATIC_ICONS.openFileSub,
           label: dict.settings.cmenuUI.openDisk,
-          shortcut: getKeyDisplay(hotkeys.openFile?.[0] || "Ctrl+KeyO"),
+          shortcut: getKeyDisplay(hotkeys.openFile?.[0] || "Ctrl+KeyO", locale),
           action: () => {
             onOpenFile?.();
             handleClose();
@@ -375,7 +377,7 @@ export function buildContextMenuItems(params: ContextMenuBuilderParams): MenuIte
           type: "item" as const,
           icon: STATIC_ICONS.search,
           label: dict.settings.cmenuUI.searchSub,
-          shortcut: getKeyDisplay(hotkeys.searchSubtitles?.[0] || "Ctrl+KeyF"),
+          shortcut: getKeyDisplay(hotkeys.searchSubtitles?.[0] || "Ctrl+KeyF", locale),
           action: () => {
             onShowSubtitlesSearch?.();
             handleClose();
@@ -588,7 +590,7 @@ export function buildContextMenuItems(params: ContextMenuBuilderParams): MenuIte
       type: "item",
       icon: STATIC_ICONS.screenshot,
       label: dict.settings.cmenuUI.saveFrame,
-      shortcut: getKeyDisplay(hotkeys.screenshot?.[0] || "KeyS"),
+      shortcut: getKeyDisplay(hotkeys.screenshot?.[0] || "KeyS", locale),
       action: handleTakeScreenshot,
     }),
 
@@ -596,7 +598,7 @@ export function buildContextMenuItems(params: ContextMenuBuilderParams): MenuIte
       type: "item",
       icon: STATIC_ICONS.mediaInfo,
       label: dict.settings.cmenuUI.fileInfo,
-      shortcut: getKeyDisplay(hotkeys.fileInfo?.[0] || "KeyI"),
+      shortcut: getKeyDisplay(hotkeys.fileInfo?.[0] || "KeyI", locale),
       action: () => {
         onShowMediaInfo();
         handleClose();
@@ -607,7 +609,7 @@ export function buildContextMenuItems(params: ContextMenuBuilderParams): MenuIte
       type: "item",
       icon: STATIC_ICONS.detailedMediaInfo,
       label: dict.settings.cmenuUI.mediaInfo,
-      shortcut: getKeyDisplay(hotkeys.detailedMediaInfo?.[0] || "Shift+F10"),
+      shortcut: getKeyDisplay(hotkeys.detailedMediaInfo?.[0] || "Shift+F10", locale),
       action: () => {
         onShowDetailedMediaInfo?.();
         handleClose();
@@ -682,7 +684,7 @@ export function buildContextMenuItems(params: ContextMenuBuilderParams): MenuIte
       label: dict.settings.cmenuUI.timeFmt,
       children: [
         { type: "header" as const, label: dict.settings.cmenuUI.groupTimeFmt },
-        ...TIME_FORMAT_OPTIONS.map((fmtOption) => {
+        ...getTimeFormatOptions().map((fmtOption) => {
           const fmtLabelMap: Record<string, string> = {
             elapsed_total: dict.settings.cmenuUI.fmtElapsedTotal,
             elapsed_remaining: dict.settings.cmenuUI.fmtElapsedRemaining,

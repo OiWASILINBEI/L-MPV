@@ -2,6 +2,7 @@ import React from "react";
 import type { MediaInfo } from "../../../contexts/PlayerStateContext";
 import { formatTime } from "../../../utils/timeUtils";
 import { formatBytes } from "./mediaInfoOverlayUtils";
+import { cleanMediaName } from "../../../utils/mediaNameUtils";
 import { useTranslation } from "../../../i18n/LanguageContext";
 
 /**
@@ -23,7 +24,7 @@ export const MediaInfoGeneralSection: React.FC<MediaInfoGeneralSectionProps> = (
   currentPosition,
 }) => {
   const { dict } = useTranslation();
-  const filename = mediaInfo?.path ? mediaInfo.path.split(/[/\\]/).pop() : "—";
+  const filename = mediaInfo?.path ? cleanMediaName(mediaInfo.path) || "—" : "—";
 
   return (
     <div className="media-info__section">

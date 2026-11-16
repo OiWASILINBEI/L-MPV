@@ -7,7 +7,7 @@
  */
 
 /** Доступные локали плеера. */
-export type Locale = "ru" | "en";
+export type Locale = "ru" | "en" | "zh";
 
 /**
  * Полная структура словаря переводов.
@@ -220,6 +220,7 @@ export interface TranslationDict {
       languageDesc: string;
       languageRu: string;
       languageEn: string;
+      languageZh: string;
       // Контекстное меню
       contextMenuSection: string;
       // Качество видео и аудио
@@ -1167,6 +1168,7 @@ export interface TranslationDict {
     dragHeader: string;
     langTooltipRu: string;
     langTooltipEn: string;
+    langTooltipZh: string;
     copyReport: string;
     exportTxt: string;
     close: string;
@@ -1203,6 +1205,22 @@ export interface TranslationDict {
     rotation: (degrees: number) => string;
     zoomReset: string;
     zoomLevel: (pct: number) => string;
+    /** Громкость в процентах */
+    volume: (pct: number) => string;
+    /** Звук выключен (громкость 0) */
+    muted: string;
+    /** Скорость воспроизведения, например "1.5x" */
+    speed: (value: string) => string;
+    /** Запущен новый файл */
+    nowPlaying: (name: string) => string;
+    /** Переключение аудиодорожки */
+    audioTrack: (name: string) => string;
+    /** Переключение субтитров */
+    subTrack: (name: string) => string;
+    /** Общее состояние «включено» */
+    enabled: string;
+    /** Общее состояние «выключено» */
+    disabled: string;
     ambientMode: (mode: string) => string;
     audioLoaded: (name: string) => string;
     subsLoaded: (name: string) => string;

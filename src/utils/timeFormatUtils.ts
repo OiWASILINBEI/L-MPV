@@ -21,32 +21,95 @@ export interface TimeFormatOption {
   example: string;
 }
 
-export const TIME_FORMAT_OPTIONS: TimeFormatOption[] = [
-  {
-    id: "elapsed_total",
-    label: "Прошедшее / Общее",
-    desc: "Стандартное отображение",
-    example: "00:15 / 24:00",
+/** Локализованные подписи режимов отображения времени. */
+const TIME_FORMAT_COPY: Record<
+  Locale,
+  Record<TimeFormatMode, Omit<TimeFormatOption, "id">>
+> = {
+  ru: {
+    elapsed_total: {
+      label: "Прошедшее / Общее",
+      desc: "Стандартное отображение",
+      example: "00:15 / 24:00",
+    },
+    elapsed_remaining: {
+      label: "Прошедшее / Оставшееся",
+      desc: "С минусом до конца",
+      example: "00:15 / -23:45",
+    },
+    remaining_only: {
+      label: "Только обратный отсчет",
+      desc: "Сколько осталось до конца",
+      example: "-23:45",
+    },
+    finish_time: {
+      label: "Время окончания фильма",
+      desc: "По часам Windows с учётом скорости",
+      example: "Конец в 22:15",
+    },
   },
-  {
-    id: "elapsed_remaining",
-    label: "Прошедшее / Оставшееся",
-    desc: "С минусом до конца",
-    example: "00:15 / -23:45",
+  en: {
+    elapsed_total: {
+      label: "Elapsed / Total",
+      desc: "Standard display",
+      example: "00:15 / 24:00",
+    },
+    elapsed_remaining: {
+      label: "Elapsed / Remaining",
+      desc: "Remaining time with a minus sign",
+      example: "00:15 / -23:45",
+    },
+    remaining_only: {
+      label: "Remaining only",
+      desc: "How much time is left until the end",
+      example: "-23:45",
+    },
+    finish_time: {
+      label: "Estimated finish time",
+      desc: "Windows clock adjusted for playback speed",
+      example: "Ends at 22:15",
+    },
   },
-  {
-    id: "remaining_only",
-    label: "Только обратный отсчет",
-    desc: "Сколько осталось до конца",
-    example: "-23:45",
+  zh: {
+    elapsed_total: {
+      label: "已播 / 总时长",
+      desc: "标准显示方式",
+      example: "00:15 / 24:00",
+    },
+    elapsed_remaining: {
+      label: "已播 / 剩余",
+      desc: "剩余时间带负号",
+      example: "00:15 / -23:45",
+    },
+    remaining_only: {
+      label: "仅剩余时间",
+      desc: "距离播放结束还有多久",
+      example: "-23:45",
+    },
+    finish_time: {
+      label: "预计结束时间",
+      desc: "按系统时钟并考虑播放速度",
+      example: "结束于 22:15",
+    },
   },
-  {
-    id: "finish_time",
-    label: "Время окончания фильма",
-    desc: "По часам Windows с учётом скорости",
-    example: "Конец в 22:15",
-  },
+};
+
+const TIME_FORMAT_MODES: TimeFormatMode[] = [
+  "elapsed_total",
+  "elapsed_remaining",
+  "remaining_only",
+  "finish_time",
 ];
+
+/**
+ * Получение списка режимов отображения времени с подписями на нужном языке.
+ * Без аргумента используется текущая локаль плеера.
+ */
+export function getTimeFormatOptions(locale?: Locale): TimeFormatOption[] {
+  const activeLocale = locale ?? getEffectiveLocale();
+  const copy = TIME_FORMAT_COPY[activeLocale] || TIME_FORMAT_COPY.ru;
+  return TIME_FORMAT_MODES.map((id) => ({ id, ...copy[id] }));
+}
 
 /**
  * Чтение сохранённого формата времени из localStorage с валидацией.
@@ -133,7 +196,7 @@ export function formatTimeByMode(
       const hours = finishDate.getHours().toString().padStart(2, "0");
       const minutes = finishDate.getMinutes().toString().padStart(2, "0");
       const activeLocale = locale ?? getEffectiveLocale();
-      const prefix = activeLocale === "ru" ? "Конец в" : "Ends at";
+      const prefix = activeLocale === "ru" ? "Конец в" : activeLocale === "zh" ? "结束于" : "Ends at";
       const full = `${prefix} ${hours}:${minutes} (${formatTime(posSec)})`;
       const compact = `~${hours}:${minutes}`;
       return { full, compact };

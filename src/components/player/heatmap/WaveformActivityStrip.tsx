@@ -215,7 +215,9 @@ export const WaveformActivityStrip: React.FC<WaveformActivityStripProps> = React
 
   // 2. Управляемая загрузка профиля данных с защитой от поздних ответов и гонок отмены
   useEffect(() => {
-    if (!mediaPath || !heatmapConfig.enabled) {
+    // 在线流（http/https）无法做码率波形分析，直接跳过，不弹“指标不可用”
+    const isRemoteStream = /^https?:\/\//i.test(mediaPath ?? "");
+    if (!mediaPath || !heatmapConfig.enabled || isRemoteStream) {
       setHeatmapResponse(null);
       setSamples(null);
       setLoadingStatus("idle");

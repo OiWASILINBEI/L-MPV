@@ -1,4 +1,4 @@
-import { ParsedMediaInfoSection, ParsedMediaInfoRow } from "../../../utils/mediaInfoParser";
+import { ParsedMediaInfoSection, ParsedMediaInfoRow, MediaInfoLang } from "../../../utils/mediaInfoParser";
 
 export type CategoryKey = "all" | "general" | "video" | "audio" | "text" | "menu" | "other";
 
@@ -23,11 +23,11 @@ export interface MediaInfoProcessedSection extends Omit<ParsedMediaInfoSection, 
  */
 export function getSectionCategoryKey(title: string): CategoryKey {
   const t = title.toLowerCase();
-  if (t.startsWith("общ") || t.startsWith("general")) return "general";
-  if (t.startsWith("вид") || t.startsWith("video")) return "video";
-  if (t.startsWith("ауд") || t.startsWith("audio")) return "audio";
-  if (t.startsWith("текст") || t.startsWith("text") || t.startsWith("субт") || t.startsWith("sub")) return "text";
-  if (t.startsWith("меню") || t.startsWith("menu") || t.startsWith("глав") || t.startsWith("chap")) return "menu";
+  if (t.startsWith("общ") || t.startsWith("general") || t.startsWith("通用") || t.startsWith("常规")) return "general";
+  if (t.startsWith("вид") || t.startsWith("video") || t.startsWith("视频")) return "video";
+  if (t.startsWith("ауд") || t.startsWith("audio") || t.startsWith("音频")) return "audio";
+  if (t.startsWith("текст") || t.startsWith("text") || t.startsWith("субт") || t.startsWith("sub") || t.startsWith("文本") || t.startsWith("字幕")) return "text";
+  if (t.startsWith("меню") || t.startsWith("menu") || t.startsWith("глав") || t.startsWith("chap") || t.startsWith("菜单") || t.startsWith("章节")) return "menu";
   return "other";
 }
 
@@ -36,7 +36,7 @@ export function getSectionCategoryKey(title: string): CategoryKey {
  */
 export function buildCategoryTabs(
   sections: ParsedMediaInfoSection[],
-  useRussian: boolean
+  lang: MediaInfoLang
 ): MediaInfoCategoryTab[] {
   if (sections.length === 0) return [];
 
@@ -55,27 +55,29 @@ export function buildCategoryTabs(
     counts[cat] = (counts[cat] || 0) + 1;
   }
 
+  const L = (ru: string, en: string, zh: string) => (lang === "ru" ? ru : lang === "zh" ? zh : en);
+
   const tabs: MediaInfoCategoryTab[] = [
-    { key: "all", label: useRussian ? "Все" : "All", count: sections.length },
+    { key: "all", label: L("Все", "All", "全部"), count: sections.length },
   ];
 
   if (counts.general > 0) {
-    tabs.push({ key: "general", label: useRussian ? "Общее" : "General", count: counts.general });
+    tabs.push({ key: "general", label: L("Общее", "General", "通用"), count: counts.general });
   }
   if (counts.video > 0) {
-    tabs.push({ key: "video", label: useRussian ? "Видео" : "Video", count: counts.video });
+    tabs.push({ key: "video", label: L("Видео", "Video", "视频"), count: counts.video });
   }
   if (counts.audio > 0) {
-    tabs.push({ key: "audio", label: useRussian ? "Аудио" : "Audio", count: counts.audio });
+    tabs.push({ key: "audio", label: L("Аудио", "Audio", "音频"), count: counts.audio });
   }
   if (counts.text > 0) {
-    tabs.push({ key: "text", label: useRussian ? "Субтитры" : "Subtitles", count: counts.text });
+    tabs.push({ key: "text", label: L("Субтитры", "Subtitles", "文本"), count: counts.text });
   }
   if (counts.menu > 0) {
-    tabs.push({ key: "menu", label: useRussian ? "Главы" : "Chapters", count: counts.menu });
+    tabs.push({ key: "menu", label: L("Главы", "Chapters", "章节"), count: counts.menu });
   }
   if (counts.other > 0) {
-    tabs.push({ key: "other", label: useRussian ? "Другое" : "Other", count: counts.other });
+    tabs.push({ key: "other", label: L("Другое", "Other", "其他"), count: counts.other });
   }
 
   return tabs;
