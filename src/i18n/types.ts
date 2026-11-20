@@ -124,7 +124,7 @@ export interface TranslationDict {
 
   // ─── Главы (ChaptersModal) ─────────────────────────────────────
   chapters: {
-    title: (count: number) => string;
+    title: string;
     close: string;
     noChapters: string;
     /** Название первого сегмента шкалы времени до первой главы */
@@ -209,10 +209,8 @@ export interface TranslationDict {
       subAvoidUiDesc: string;
       saveTracksToDirTitle: string;
       saveTracksToDirDesc: string;
-      waveformActivityTitle: string;
       timelinePreviewTitle: string;
       timelinePreviewDesc: string;
-      waveformActivityDesc: string;
 
       // Язык
       languageSection: string;
@@ -1086,6 +1084,9 @@ export interface TranslationDict {
     displayFps: string;
     avSync: string;
     voDelayed: string;
+    pcLabel: string;
+    delayedWord: string;
+    mistimedWord: string;
     // Секция дорожек и глав
     audioTracksTitle: string;
     subTracksTitle: string;

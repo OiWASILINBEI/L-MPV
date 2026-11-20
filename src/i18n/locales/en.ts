@@ -115,7 +115,7 @@ export const en: TranslationDict = {
 
   // ─── Chapters ──────────────────────────────────────────────────
   chapters: {
-    title: (count) => `Chapters (${count})`,
+    title: "Chapters",
     close: "Close (Esc)",
     noChapters: "No chapter markers in this file.",
     start: "Start",
@@ -211,9 +211,6 @@ export const en: TranslationDict = {
         "When exporting a track via the download button, save the file directly in the video's directory. Disabled = pick a folder manually.",
       timelinePreviewTitle: "Timeline preview",
       timelinePreviewDesc: "Show a video frame when hovering over the timeline.",
-      waveformActivityTitle: "Waveform Activity Strip",
-      waveformActivityDesc:
-        "Display an interactive audio heatmap satellite above the timeline when hovering or scrubbing with precise volume peaks.",
 
       // Language
       languageSection: "Interface Language",
@@ -840,7 +837,7 @@ export const en: TranslationDict = {
     hotkeys: {
       hotkeysSection: "Hotkeys",
       fallbackOwner: "Turn off upscaling",
-      helpText: "💡 Press any key in the list below to assign your combination!",
+      helpText: "Select a shortcut in the list to change it",
       btnReset: "Reset",
       sectionTitle: "Hotkey Assignments",
       pressKey: "Press…",
@@ -866,10 +863,8 @@ export const en: TranslationDict = {
         togglePause: "Play / Pause",
         toggleRepeat: "Repeat mode",
         toggleShuffle: "Shuffle mode",
-        seekBack: "Seek backward (-5 sec)",
-        seekForward: "Seek forward (+5 sec)",
-        seekBack10: "Seek backward (-10 sec)",
-        seekForward10: "Seek forward (+10 sec)",
+        seekBack: "Seek backward",
+        seekForward: "Seek forward",
         skipOpening: "Skip opening",
         frameBack: "Previous frame",
         frameForward: "Next frame",
@@ -1219,7 +1214,7 @@ export const en: TranslationDict = {
       telegramTooltip: "Author's Telegram",
       checkUpdates: "Check for Updates",
       checking: "Checking…",
-      upToDate: "Up to date",
+      upToDate: "Current version",
       updateFound: (version: string) => `Version ${version} available`,
       checkFailed: "Failed to check updates",
       portableEdition: "Portable Edition",
@@ -1265,6 +1260,9 @@ export const en: TranslationDict = {
     displayFps: "Display refresh:",
     avSync: "A/V Sync:",
     voDelayed: "Delayed / Mistimed:",
+    pcLabel: "PC",
+    delayedWord: "delayed",
+    mistimedWord: "mistimed",
     // Tracks & chapters section
     audioTracksTitle: "Audio Tracks",
     subTracksTitle: "Subtitles",

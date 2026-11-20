@@ -786,10 +786,14 @@ pub(crate) fn resolve_bit_depth(
 #[tauri::command]
 pub fn get_media_info(
     state: State<'_, PlayerState>,
+    live_bitrate: State<'_, crate::commands::LiveVideoBitrateService>,
 ) -> Result<MediaInfo, String> {
     let mpv = &state.mpv;
     let current_path =
         mpv.get_property_string("path").unwrap_or_default();
+    let position = mpv
+        .get_property_double("time-pos")
+        .unwrap_or(0.0);
     // Размеры окна можно использовать только после того, как проверяемые
     // свойства относятся к тому же файлу, что и текущий путь.
     let output_status = mpv.video_output_status_for(&current_path);
@@ -835,13 +839,13 @@ pub fn get_media_info(
     let color_space = resolve_color_space(&primaries, &colormatrix);
     let bit_depth =
         resolve_bit_depth(&plane_depth_str, &[&pixel_format, &hw_pixel_format]);
+    let (audio_codec, audio_channels) = mpv.get_active_audio_info();
+    let audio_disabled = audio_codec.is_empty() && audio_channels.is_empty();
 
     Ok(MediaInfo {
-        path: current_path,
+        path: current_path.clone(),
         duration,
-        position: mpv
-            .get_property_double("time-pos")
-            .unwrap_or(0.0),
+        position,
         frame: mpv
             .get_property_double("estimated-frame-number")
             .unwrap_or(0.0) as i64,
@@ -859,9 +863,7 @@ pub fn get_media_info(
         video_codec: normalize_video_codec(
             &mpv.get_property_string("video-codec").unwrap_or_default(),
         ),
-        audio_codec: mpv
-            .get_property_string("audio-codec-name")
-            .unwrap_or_default(),
+        audio_codec,
         paused: mpv
             .get_property_string("pause")
             .unwrap_or_default()
@@ -873,12 +875,10 @@ pub fn get_media_info(
             .get_property_double("volume")
             .unwrap_or(100.0),
         file_size,
-        audio_channels: mpv
-            .get_property_string(
-                "audio-params/channel-count",
-            )
-            .unwrap_or_default(),
-        audio_bitrate: {
+        audio_channels,
+        audio_bitrate: if audio_disabled {
+            0.0
+        } else {
             let ab = mpv
                 .get_property_double("audio-bitrate")
                 .unwrap_or(0.0);
@@ -892,17 +892,25 @@ pub fn get_media_info(
             }
         },
         video_bitrate: {
-            let vb = mpv
-                .get_property_double("video-bitrate")
-                .unwrap_or(0.0);
-            if vb > 0.0 {
-                vb
-            } else {
-                mpv.get_property_double(
-                    "packet-video-bitrate",
-                )
-                .unwrap_or(0.0)
-            }
+            let current_vid = mpv
+                .get_property_string("vid")
+                .ok()
+                .and_then(|s| s.trim().parse::<i64>().ok());
+            live_bitrate
+                .peek_cached_bitrate(&current_path, current_vid, position)
+                .unwrap_or_else(|| {
+                    let vb = mpv
+                        .get_property_double("video-bitrate")
+                        .unwrap_or(0.0);
+                    if vb > 0.0 {
+                        vb
+                    } else {
+                        mpv.get_property_double(
+                            "packet-video-bitrate",
+                        )
+                        .unwrap_or(0.0)
+                    }
+                })
         },
         total_bitrate,
         hdr_info,
@@ -921,8 +929,18 @@ pub fn get_media_info(
 #[tauri::command]
 pub fn get_playback_state(
     state: State<'_, PlayerState>,
+    live_bitrate: State<'_, crate::commands::LiveVideoBitrateService>,
 ) -> Result<PlaybackState, String> {
-    state.mpv.get_playback_state_snapshot()
+    let mut snapshot = state.mpv.get_playback_state_snapshot()?;
+    let current_vid = snapshot.current_vid.trim().parse::<i64>().ok();
+    if let Some(exact_bps) = live_bitrate.peek_cached_bitrate(
+        &snapshot.path,
+        current_vid,
+        snapshot.position,
+    ) {
+        snapshot.video_bitrate = exact_bps;
+    }
+    Ok(snapshot)
 }
 
 /// Получение фактических размеров сконфигурированного видеовыхода.

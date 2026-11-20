@@ -32,7 +32,7 @@ export interface MediaInfo {
   speed: number;
   volume: number;
   file_size: number;
-  audio_channels: number;
+  audio_channels: string;
   audio_bitrate: number;
   video_bitrate: number;
   total_bitrate: number;
@@ -224,6 +224,45 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
   const currentVidRef = useRef<string>("");
   const trackCountRef = useRef<number>(0);
   const mediaInfoRef = useRef<MediaInfo | null>(null);
+  const mediaInfoLoadSeqRef = useRef<number>(0);
+
+  const refreshMediaInfo = useCallback(async (expectedPath?: string) => {
+    const reqSeq = ++mediaInfoLoadSeqRef.current;
+    const targetPath = expectedPath ?? currentPathRef.current;
+    try {
+      const latestInfo = await invoke<MediaInfo>("get_media_info");
+      if (
+        reqSeq !== mediaInfoLoadSeqRef.current ||
+        !latestInfo.path ||
+        (targetPath && latestInfo.path !== targetPath) ||
+        latestInfo.path !== currentPathRef.current
+      ) {
+        return;
+      }
+      setMediaInfo((prev) => {
+        const effectiveWidth =
+          latestInfo.width > 0 ? latestInfo.width : (prev?.width ?? 0);
+        const effectiveHeight =
+          latestInfo.height > 0 ? latestInfo.height : (prev?.height ?? 0);
+        const hasVideoDimensions = effectiveWidth > 0 && effectiveHeight > 0;
+        const next: MediaInfo = {
+          ...(prev ?? latestInfo),
+          ...latestInfo,
+          duration:
+            latestInfo.duration > 0 ? latestInfo.duration : (prev?.duration ?? 0),
+          width: effectiveWidth,
+          height: effectiveHeight,
+          video_ready: Boolean(
+            (latestInfo.video_ready || prev?.video_ready) && hasVideoDimensions
+          ),
+        };
+        mediaInfoRef.current = next;
+        return next;
+      });
+    } catch (e) {
+      console.error("Ошибка обновления метаданных медиафайла", e);
+    }
+  }, []);
 
   const loadTracks = useCallback(async () => {
     const reqSeq = ++tracksLoadSeqRef.current;
@@ -503,11 +542,14 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
               tracksRef.current = [];
               setTracks([]);
             }
-            currentAidRef.current = "";
-            currentSidRef.current = "";
-            currentVidRef.current = "";
-            trackCountRef.current = 0;
-            hasMediaInfoRef.current = effectiveDuration> 0;
+            currentAidRef.current = dynState.current_aid;
+            currentSidRef.current = dynState.current_sid;
+            currentVidRef.current = dynState.current_vid;
+            trackCountRef.current = dynState.track_count;
+            mediaInfoLoadSeqRef.current += 1;
+            // Metadata is initialized even for live streams with no known duration.
+            hasMediaInfoRef.current = true;
+            currentPositionRef.current = fullInfo.position;
             const effectiveWidth = fullInfo.width> 0 ? fullInfo.width : 0;
             const effectiveHeight = fullInfo.height> 0 ? fullInfo.height : 0;
             const hasVideoDimensions = effectiveWidth> 0 && effectiveHeight> 0;
@@ -559,6 +601,7 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
             currentPositionRef.current = 0;
             hasMediaInfoRef.current = false;
             mediaInfoRef.current = null;
+            mediaInfoLoadSeqRef.current += 1;
             tracksLoadSeqRef.current += 1;
             tracksMediaPathRef.current = "";
             tracksRef.current = [];
@@ -602,6 +645,9 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
             currentVidRef.current = dynState.current_vid;
             trackCountRef.current = dynState.track_count;
             loadTracks();
+            if (aidChanged || vidChanged) {
+              void refreshMediaInfo(dynState.path);
+            }
           }
 
           // Проверяем, доехал ли mpv до цели seek или истек таймаут
@@ -636,11 +682,20 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
 
           // Если в mediaInfo длительность была 0, но в mpv контейнер дочитался (> 0):
           if (dynState.duration> 0 && (!mediaInfoRef.current || mediaInfoRef.current.duration <= 0)) {
+            // A stream can initialize before container headers. Refresh static
+            // metadata once when duration becomes available, not on every poll.
+            const completedInfo = await invoke<MediaInfo>("get_media_info").catch(() => null);
+            if (isCancelled) return;
+            if (completedInfo && completedInfo.path !== dynState.path) return;
             hasMediaInfoRef.current = true;
             if (mediaInfoRef.current) {
               const updatedMedia: MediaInfo = {
                 ...mediaInfoRef.current,
+                ...(completedInfo ?? {}),
                 duration: dynState.duration,
+                volume: mediaInfoRef.current.volume,
+                paused: dynState.paused,
+                speed: dynState.speed,
               };
               mediaInfoRef.current = updatedMedia;
               setMediaInfo(updatedMedia);
@@ -664,7 +719,7 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
           if (currentMedia && dynState.path === currentPathRef.current) {
             const isPausedChanged = currentMedia.paused !== dynState.paused;
             const isSpeedChanged = currentMedia.speed !== dynState.speed;
-            // Пока дебаунс громкости не сброшен — backend ещё хранит старое
+            // Пока очередь громкости не отправлена — backend ещё хранит старое
             // значение, оптимистичное UI не затираем.
             const isVolumeChanged = pendingVolumeRef.current === null
               && currentMedia.volume !== dynState.volume;
@@ -766,7 +821,7 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       }
       window.removeEventListener("l-mpv-force-poll", handleForcePoll);
     };
-  }, [loadTracks, refreshPlaylist]);
+  }, [loadTracks, refreshPlaylist, refreshMediaInfo]);
 
   // ─── Единая точка входа для seek ───
   const seekTo = useCallback(async (seconds: number) => {
@@ -777,6 +832,7 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
 
     seekingRef.current = true;
     seekTargetRef.current = seconds;
+    currentPositionRef.current = seconds;
     seekTimestampRef.current = Date.now();
     setSeeking(true);
     setSeekTarget(seconds);
@@ -795,6 +851,7 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
 
     try {
       await invoke("seek_absolute", { seconds });
+      window.dispatchEvent(new Event("l-mpv-force-poll"));
     } catch (e) {
       // При ошибке немедленно сбрасываем seeking
       if (seekTimeoutIdRef.current !== null) {
@@ -921,11 +978,11 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // ─── Оптимистичное изменение громкости с дебаунсом IPC ───
-  // UI + localStorage — мгновенно, invoke(set_volume) — с дебаунсом 100мс.
-  // Колесо/драг слайдера даёт десятки событий в секунду — без дебаунса
+  // ─── Оптимистичное изменение громкости с объединением IPC ───
+  // UI + localStorage — мгновенно; последняя громкость отправляется раз в окно 50 мс.
+  // Колесо/драг слайдера даёт десятки событий в секунду — без объединения
   // каждое дёргает mpv + WASAPI через IPC.
-  const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const volumeFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flushVolumeRef = useRef(() => {});
   flushVolumeRef.current = () => {
     if (pendingVolumeRef.current === null) return;
@@ -935,7 +992,7 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
   };
   useEffect(() => {
     return () => {
-      if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current);
+      if (volumeFlushTimerRef.current) clearTimeout(volumeFlushTimerRef.current);
       flushVolumeRef.current();
     };
   }, []);
@@ -956,11 +1013,13 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       console.error(e);
     }
     pendingVolumeRef.current = clamped;
-    if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current);
-    volumeDebounceRef.current = setTimeout(() => {
-      volumeDebounceRef.current = null;
-      flushVolumeRef.current();
-    }, 100);
+    // Bounded coalescing: continuous input must not postpone audio indefinitely.
+    if (volumeFlushTimerRef.current === null) {
+      volumeFlushTimerRef.current = setTimeout(() => {
+        volumeFlushTimerRef.current = null;
+        flushVolumeRef.current();
+      }, 50);
+    }
   }, []);
 
   // ─── Интеграция с Taskbar Windows с фильтрацией шага ───
@@ -1062,10 +1121,12 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
         invoke("show_osd", { text: offText }).catch(() => {});
       }
       await loadTracks();
+      await refreshMediaInfo();
+      window.dispatchEvent(new Event("l-mpv-force-poll"));
     } catch (e) {
       console.error("Ошибка при выборе аудиодорожки", e);
     }
-  }, [loadTracks]);
+  }, [loadTracks, refreshMediaInfo]);
   
   const disableSubtitles = useCallback(async () => {
     try {

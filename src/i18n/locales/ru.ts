@@ -115,7 +115,7 @@ export const ru: TranslationDict = {
 
   // ─── Главы ─────────────────────────────────────────────────────
   chapters: {
-    title: (count) => `Главы (${count})`,
+    title: "Главы",
     close: "Закрыть (Esc)",
     noChapters: "В этом файле нет размеченных глав.",
     start: "Начало",
@@ -214,9 +214,6 @@ export const ru: TranslationDict = {
         "При экспорте дорожки через кнопку «Скачать» сохранять файл прямо в каталог с фильмом. Если выключено — открывается окно Проводника для выбора папки вручную.",
       timelinePreviewTitle: "Предосмотр на таймлайне",
       timelinePreviewDesc: "Показывать кадр видео при наведении на шкалу времени.",
-      waveformActivityTitle: "Звуковая тепловая карта",
-      waveformActivityDesc:
-        "Отображать интерактивный звуковой сателлит над таймлайном при наведении или перемотке с точным отображением пиков громкости.",
 
       // Язык
       languageSection: "Язык интерфейса",
@@ -844,7 +841,7 @@ export const ru: TranslationDict = {
     hotkeys: {
       hotkeysSection: "Горячие клавиши",
       fallbackOwner: "Выключение апскейлинга",
-      helpText: "💡 Нажмите на любую клавишу в списке ниже, чтобы назначить свою комбинацию!",
+      helpText: "Выберите сочетание в списке, чтобы изменить его",
       btnReset: "Сбросить",
       sectionTitle: "Назначения горячих клавиш",
       pressKey: "Нажмите…",
@@ -870,10 +867,8 @@ export const ru: TranslationDict = {
         togglePause: "Воспроизведение / Пауза",
         toggleRepeat: "Режим повтора",
         toggleShuffle: "Случайный порядок",
-        seekBack: "Перемотка назад (-5 сек)",
-        seekForward: "Перемотка вперед (+5 сек)",
-        seekBack10: "Перемотка назад (-10 сек)",
-        seekForward10: "Перемотка вперед (+10 сек)",
+        seekBack: "Перемотка назад",
+        seekForward: "Перемотка вперед",
         skipOpening: "Перемотка опенинга",
         frameBack: "Кадр назад",
         frameForward: "Кадр вперед",
@@ -1223,7 +1218,7 @@ export const ru: TranslationDict = {
       telegramTooltip: "Telegram-канал автора",
       checkUpdates: "Проверить обновления",
       checking: "Проверка…",
-      upToDate: "Установлена актуальная версия",
+      upToDate: "Актуальная версия",
       updateFound: (version: string) => `Доступна версия ${version}`,
       checkFailed: "Не удалось проверить обновления",
       portableEdition: "Portable-редакция",
@@ -1269,6 +1264,9 @@ export const ru: TranslationDict = {
     displayFps: "Частота дисплея:",
     avSync: "A/V Sync:",
     voDelayed: "Задержки / сбои:",
+    pcLabel: "ПК",
+    delayedWord: "задерж.",
+    mistimedWord: "сбоев",
     // Секция дорожек и глав
     audioTracksTitle: "Аудиодорожки",
     subTracksTitle: "Субтитры",

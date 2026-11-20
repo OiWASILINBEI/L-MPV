@@ -110,7 +110,7 @@ export const zh: TranslationDict = {
 
   // ─── 章节 ─────────────────────────────────────────────────────
   chapters: {
-    title: (count) => `章节 (${count})`,
+    title: "章节",
     close: "关闭 (Esc)",
     noChapters: "此文件没有章节标记。",
     start: "开始",
@@ -206,9 +206,6 @@ export const zh: TranslationDict = {
         "通过下载按钮导出轨道时，直接保存到视频所在目录。关闭则手动选择文件夹。",
       timelinePreviewTitle: "进度条预览",
       timelinePreviewDesc: "悬停在进度条上时显示视频画面预览。",
-      waveformActivityTitle: "音频热力图",
-      waveformActivityDesc:
-        "悬停或拖动进度条时，在进度条上方显示交互式音频热力图小组件，精确呈现音量峰值。",
       // 语言
       languageSection: "界面语言",
       languageTitle: "界面语言",
@@ -1259,6 +1256,9 @@ export const zh: TranslationDict = {
     displayFps: "显示器刷新率：",
     avSync: "音视频同步：",
     voDelayed: "延迟 / 失步：",
+    pcLabel: "电脑",
+    delayedWord: "延迟",
+    mistimedWord: "失步",
     audioTracksTitle: "音频轨道",
     subTracksTitle: "字幕",
     chaptersTitle: "章节",

@@ -1,3 +1,4 @@
+import { SelectionRail } from "../../motion/SelectionRail";
 import React from "react";
 import { ChevronsUpDown } from "lucide-react";
 import { CategoryKey, MediaInfoCategoryTab } from "./mediaInfoTypes";
@@ -9,7 +10,8 @@ interface MediaInfoTabsBarProps {
   onSelectCategory: (category: CategoryKey) => void;
   areAllCollapsed: boolean;
   onToggleCollapseAll: () => void;
-  lang: MediaInfoLang;
+  useRussian?: MediaInfoLang;
+  lang?: MediaInfoLang;
   style?: React.CSSProperties;
 }
 
@@ -19,21 +21,24 @@ export const MediaInfoTabsBar: React.FC<MediaInfoTabsBarProps> = React.memo(({
   onSelectCategory,
   areAllCollapsed,
   onToggleCollapseAll,
+  useRussian,
   lang,
   style,
 }) => {
-  const L = (ru: string, en: string, zh: string) => (lang === "ru" ? ru : lang === "zh" ? zh : en);
+  const activeLang: MediaInfoLang = lang ?? useRussian ?? "ru";
+  const L = (ru: string, en: string, zh: string) => (activeLang === "ru" ? ru : activeLang === "zh" ? zh : en);
   if (tabs.length <= 1) return null;
 
   return (
     <div className="mediainfo-standalone__tabs-bar" style={style}>
-      <div className="mediainfo-standalone__tabs-list">
+      <SelectionRail activeKey={activeCategory} className="mediainfo-standalone__tabs-list">
         {tabs.map((tab) => {
           const isActive = activeCategory === tab.key;
           return (
             <button
               key={tab.key}
               type="button"
+              aria-current={isActive ? "true" : undefined}
               className={`mediainfo-tab-chip ${isActive ? "mediainfo-tab-chip--active" : ""}`}
               onClick={() => onSelectCategory(isActive && tab.key !== "all" ? "all" : tab.key)}
             >
@@ -44,7 +49,7 @@ export const MediaInfoTabsBar: React.FC<MediaInfoTabsBarProps> = React.memo(({
             </button>
           );
         })}
-      </div>
+      </SelectionRail>
 
       <button
         type="button"
