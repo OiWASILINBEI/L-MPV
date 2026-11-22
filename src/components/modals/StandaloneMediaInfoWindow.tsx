@@ -19,6 +19,8 @@ import {
   RefreshCw,
   Pin,
   FileUp,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { parseMediaInfoLines, MediaInfoLang } from "../../utils/mediaInfoParser";
 import {
@@ -28,6 +30,7 @@ import {
   MediaInfoTabsBar,
   MediaInfoSectionList,
   useMediaInfoDragDrop,
+  useMediaInfoSearchNav,
 } from "./mediainfo";
 import "../../styles/mediainfo-modal.css";
 import { getCustomHotkeys, isKeyboardEventMatch } from "../../utils/hotkeyUtils";
@@ -387,14 +390,26 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
     }
   }, [areAllCollapsed, displaySections]);
 
-  // Автопрокрутка к первому совпадению при вводе запроса
-  useEffect(() => {
-    if (!searchQuery.trim() || !bodyRef.current) return;
-    const firstMatch = bodyRef.current.querySelector(".mediainfo-row--match");
-    if (firstMatch) {
-      firstMatch.scrollIntoView({ block: "nearest", behavior: motionAllowed ? "smooth" : "auto" });
+  // 搜索匹配数量（按实际匹配的行 + 分区标题统计）
+  const matchCount = useMemo(() => {
+    if (!searchQuery.trim()) return 0;
+    let count = 0;
+    for (const sec of displaySections) {
+      for (const row of sec.rows) {
+        if (row.isMatch) count++;
+      }
     }
-  }, [searchQuery, motionAllowed]);
+    return count;
+  }, [searchQuery, displaySections]);
+
+  // 搜索结果导航（Enter / Shift+Enter 与 ↑ / ↓）
+  const { activeMatchIndex, jumpMatch, handleSearchKeyDown } = useMediaInfoSearchNav({
+    searchQuery,
+    activeCategory,
+    matchCount,
+    bodyRef,
+    motionAllowed,
+  });
 
   // Копирование полного отчёта в буфер обмена без лишних пробелов перед двоеточием
   const handleCopy = useCallback(async () => {
@@ -442,16 +457,6 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
       console.error("Ошибка экспорта в текстовый файл:", e);
     }
   }, [baseReport.cleanText, baseReport.rawText, fileName]);
-
-  // Количество совпадений поиска
-  const matchCount = useMemo(() => {
-    if (!searchQuery.trim()) return 0;
-    let count = 0;
-    for (const sec of displaySections) {
-      count += sec.matchesCount;
-    }
-    return count;
-  }, [searchQuery, displaySections]);
 
   return (
     <div
@@ -551,12 +556,37 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
             placeholder={L("Поиск по свойствам... (Ctrl+F)", "Search properties... (Ctrl+F)", "搜索属性... (Ctrl+F)")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
           />
           {searchQuery && (
             <div className="mediainfo-standalone__search-stats">
-              <span className="mediainfo-standalone__search-count">
-                {matchCount} {L("совп.", "matches", "个匹配")}
+              <span
+                className={`mediainfo-standalone__search-count ${
+                  matchCount === 0 ? "mediainfo-standalone__search-count--empty" : ""
+                }`}
+              >
+                {matchCount > 0 ? `${activeMatchIndex + 1}/${matchCount}` : "0"}
               </span>
+              <button
+                type="button"
+                className="mediainfo-standalone__btn-icon"
+                title={L("Предыдущее совпадение (Shift+Enter)", "Previous match (Shift+Enter)", "上一个匹配 (Shift+Enter)")}
+                aria-label={L("Предыдущее совпадение", "Previous match", "上一个匹配")}
+                onClick={() => jumpMatch(-1)}
+                disabled={matchCount === 0}
+              >
+                <ChevronUp size={12} />
+              </button>
+              <button
+                type="button"
+                className="mediainfo-standalone__btn-icon"
+                title={L("Следующее совпадение (Enter)", "Next match (Enter)", "下一个匹配 (Enter)")}
+                aria-label={L("Следующее совпадение", "Next match", "下一个匹配")}
+                onClick={() => jumpMatch(1)}
+                disabled={matchCount === 0}
+              >
+                <ChevronDown size={12} />
+              </button>
               <button
                 type="button"
                 className="mediainfo-standalone__btn-icon"
@@ -608,6 +638,8 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
             <Languages size={13} />
             <span>{lang === "ru" ? "RU" : lang === "zh" ? "中文" : "EN"}</span>
           </button>
+
+          <span className="mediainfo-actions-divider" aria-hidden="true" />
 
           <button
             type="button"

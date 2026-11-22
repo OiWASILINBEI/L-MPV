@@ -11,16 +11,20 @@ import {
   Loader2,
   AlertCircle,
   Languages,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { usePlayerState } from "../../contexts/PlayerStateContext";
 import { parseMediaInfoLines, MediaInfoLang } from "../../utils/mediaInfoParser";
 import { useTranslation } from "../../i18n/LanguageContext";
+import { useMotionAllowed } from "../motion/useMotionAllowed";
 import {
   CategoryKey,
   buildCategoryTabs,
   filterAndProcessSections,
   MediaInfoTabsBar,
   MediaInfoSectionList,
+  useMediaInfoSearchNav,
 } from "./mediainfo";
 import { getCustomHotkeys, isKeyboardEventMatch } from "../../utils/hotkeyUtils";
 import {
@@ -45,6 +49,7 @@ export function DetailedMediaInfoModal({
   filePath,
 }: DetailedMediaInfoModalProps) {
   const { dict, locale } = useTranslation();
+  const motionAllowed = useMotionAllowed();
   const { mediaInfo } = usePlayerState();
   const currentPath = filePath || mediaInfo?.path;
   const fileName = useMemo(() => {
@@ -235,14 +240,26 @@ export function DetailedMediaInfoModal({
     }
   }, [areAllCollapsed, displaySections]);
 
-  // Автопрокрутка к первому совпадению при поиске
-  useEffect(() => {
-    if (!searchQuery.trim() || !bodyRef.current) return;
-    const firstMatch = bodyRef.current.querySelector(".mediainfo-row--match, .mediainfo-floating-window__line--match");
-    if (firstMatch) {
-      firstMatch.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  // Подсчёт количества совпадений поиска по строкам
+  const matchCount = useMemo(() => {
+    if (!searchQuery.trim()) return 0;
+    let count = 0;
+    for (const sec of displaySections) {
+      for (const row of sec.rows) {
+        if (row.isMatch) count++;
+      }
     }
-  }, [searchQuery]);
+    return count;
+  }, [searchQuery, displaySections]);
+
+  // Навигация по совпадениям поиска
+  const { activeMatchIndex, jumpMatch, handleSearchKeyDown } = useMediaInfoSearchNav({
+    searchQuery,
+    activeCategory,
+    matchCount,
+    bodyRef,
+    motionAllowed,
+  });
 
   // Копирование полного отчёта без пробелов перед двоеточием
   const handleCopy = useCallback(async () => {
@@ -308,16 +325,6 @@ export function DetailedMediaInfoModal({
     }
   }, [baseReport.cleanText, baseReport.rawText, currentPath, dict]);
 
-  // Подсчёт количества совпадений поиска
-  const matchCount = useMemo(() => {
-    if (!searchQuery.trim()) return 0;
-    let count = 0;
-    for (const sec of displaySections) {
-      count += sec.matchesCount;
-    }
-    return count;
-  }, [searchQuery, displaySections]);
-
   if (!isOpen) return null;
 
   return (
@@ -341,19 +348,21 @@ export function DetailedMediaInfoModal({
         </div>
 
         <div className="mediainfo-floating-window__actions">
-          {/* Переключение языка (RU / EN / 中文) */}
+          {/* 切换语言 (RU / EN / 中文) */}
           <button
             type="button"
             onClick={() => setLang((p) => (p === "ru" ? "en" : p === "en" ? "zh" : "ru"))}
-            className={`mediainfo-floating-window__btn ${
+            className={`mediainfo-floating-window__btn mediainfo-floating-window__btn--lang ${
               lang !== "en" ? "mediainfo-floating-window__btn--active" : ""
             }`}
             title={lang === "ru" ? dict.detailedMediaInfoModal.langTooltipRu : lang === "zh" ? dict.detailedMediaInfoModal.langTooltipZh : dict.detailedMediaInfoModal.langTooltipEn}
             aria-label={lang === "ru" ? dict.detailedMediaInfoModal.langTooltipRu : lang === "zh" ? dict.detailedMediaInfoModal.langTooltipZh : dict.detailedMediaInfoModal.langTooltipEn}
             >
-            <Languages size={14} />
+            <Languages size={13} />
             <span style={{ fontSize: "var(--fs-2xs)", fontWeight: 600 }}>{lang === "ru" ? "RU" : lang === "zh" ? "中文" : "EN"}</span>
           </button>
+
+          <span className="mediainfo-actions-divider" aria-hidden="true" />
 
           {/* Копировать всё */}
           <button
@@ -400,6 +409,7 @@ export function DetailedMediaInfoModal({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={handleSearchKeyDown}
           placeholder={dict.detailedMediaInfoModal.searchPlaceholder}
           aria-label={dict.detailedMediaInfoModal.searchPlaceholder}
           autoComplete="off"
@@ -407,26 +417,41 @@ export function DetailedMediaInfoModal({
           className="mediainfo-floating-window__search-input"
         />
         {searchQuery && (
-          <span
-            style={{
-              fontSize: "var(--fs-2xs)",
-              color: matchCount> 0 ? "var(--accent-text)" : "var(--danger-text)",
-              padding: "0 4px",
-              whiteSpace: "nowrap",
-            }}
+          <div className="mediainfo-standalone__search-stats">
+            <span
+              className={`mediainfo-standalone__search-count ${
+                matchCount === 0 ? "mediainfo-standalone__search-count--empty" : ""
+              }`}
             >
-            {matchCount}
-          </span>
-        )}
-        {searchQuery && (
-          <button
-            onClick={() => setSearchQuery("")}
-            className="mediainfo-floating-window__search-clear"
-
-            aria-label={dict.detailedMediaInfoModal.clearSearch}
+              {matchCount > 0 ? `${activeMatchIndex + 1}/${matchCount}` : "0"}
+            </span>
+            <button
+              type="button"
+              onClick={() => jumpMatch(-1)}
+              className="mediainfo-standalone__btn-icon"
+              disabled={matchCount === 0}
+              aria-label={lang === "ru" ? "Предыдущее совпадение" : lang === "zh" ? "上一个匹配" : "Previous match"}
             >
-            <X size={12} />
-          </button>
+              <ChevronUp size={12} />
+            </button>
+            <button
+              type="button"
+              onClick={() => jumpMatch(1)}
+              className="mediainfo-standalone__btn-icon"
+              disabled={matchCount === 0}
+              aria-label={lang === "ru" ? "Следующее совпадение" : lang === "zh" ? "下一个匹配" : "Next match"}
+            >
+              <ChevronDown size={12} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="mediainfo-floating-window__search-clear"
+              aria-label={dict.detailedMediaInfoModal.clearSearch}
+            >
+              <X size={12} />
+            </button>
+          </div>
         )}
       </div>
 
@@ -438,7 +463,7 @@ export function DetailedMediaInfoModal({
           onSelectCategory={setActiveCategory}
           areAllCollapsed={areAllCollapsed}
           onToggleCollapseAll={toggleCollapseAll}
-          lang={lang}
+          useRussian={lang}
           style={{ padding: "4px 12px" }}
         />
       )}

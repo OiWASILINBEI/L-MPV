@@ -7,6 +7,8 @@ export const KEY_TRANSLATIONS: Record<string, string> = {
   // Общее
   "Unique ID": "Уникальный идентификатор",
   "Complete name": "Полное имя",
+  "Movie name": "Название фильма",
+  "Movie": "Название фильма",
   "Format": "Формат",
   "Format version": "Версия формата",
   "Format profile": "Профиль формата",
@@ -83,6 +85,8 @@ export const KEY_TRANSLATIONS: Record<string, string> = {
   "Video delay": "Задержка видео",
 
   // Текст / Субтитры
+  "Track name": "Имя дорожки",
+  "Title/String": "Заголовок",
   "Element count": "Количество элементов",
   "Count of elements": "Количество элементов",
   "Count of audio streams": "Количество аудиопотоков",
@@ -96,6 +100,8 @@ export const KEY_TRANSLATIONS_ZH: Record<string, string> = {
   // 常规
   "Unique ID": "特征 ID",
   "Complete name": "完整名称",
+  "Movie name": "影片名称",
+  "Movie": "影片名称",
   "Format": "格式",
   "Format version": "格式版本",
   "Format profile": "格式配置 (Profile)",
@@ -172,6 +178,8 @@ export const KEY_TRANSLATIONS_ZH: Record<string, string> = {
   "Video delay": "相对视频的延迟",
 
   // 文本 / 字幕
+  "Track name": "轨道名称",
+  "Title/String": "标题",
   "Element count": "元素总数",
   "Count of elements": "元素总数",
   "Count of audio streams": "音频流数量",
@@ -184,7 +192,7 @@ export const SECTION_TRANSLATIONS: Record<string, string> = {
   "General": "Общее",
   "Video": "Видео",
   "Audio": "Аудио",
-  "Text": "Текст",
+  "Text": "Субтитры",
   "Menu": "Меню",
   "Chapters": "Главы",
 };
@@ -328,6 +336,7 @@ export interface ParsedMediaInfoRow {
 export interface ParsedMediaInfoSection {
   id: string;
   title: string;
+  streamTitle?: string;
   rows: ParsedMediaInfoRow[];
   cleanText: string;
 }
@@ -344,6 +353,81 @@ export interface ParsedMediaInfoReport {
   cleanText: string;
   lines: ParsedMediaInfoLine[];
   sections: ParsedMediaInfoSection[];
+}
+
+/** 从 MediaInfo 各分区的行中提取“轨道名称 / 影片名称”，用于分区标题后缀。 */
+export function extractSectionStreamTitle(
+  sec: ParsedMediaInfoSection,
+  _lang: MediaInfoLang
+): string | undefined {
+  let titleVal = "";
+  let langVal = "";
+  let formatVal = "";
+  let movieVal = "";
+
+  for (const r of sec.rows) {
+    const k = r.key.trim().toLowerCase();
+    if (
+      k === "заголовок" ||
+      k === "title" ||
+      k === "имя дорожки" ||
+      k === "track name" ||
+      k === "title/string" ||
+      k === "标题" ||
+      k === "轨道名称"
+    ) {
+      if (!titleVal && r.value.trim()) {
+        titleVal = r.value.trim();
+      }
+    } else if (
+      k === "название фильма" ||
+      k === "movie name" ||
+      k === "movie" ||
+      k === "фильм" ||
+      k === "影片名称"
+    ) {
+      if (!movieVal && r.value.trim()) {
+        movieVal = r.value.trim();
+      }
+    } else if (k === "язык" || k === "language" || k === "语言") {
+      if (!langVal && r.value.trim()) {
+        langVal = r.value.trim();
+      }
+    } else if (k === "формат" || k === "format" || k === "格式") {
+      if (!formatVal && r.value.trim()) {
+        formatVal = r.value.trim();
+      }
+    }
+  }
+
+  if (movieVal) return movieVal;
+
+  if (titleVal) {
+    if (langVal && !titleVal.toLowerCase().includes(langVal.toLowerCase())) {
+      return `${titleVal} (${langVal})`;
+    }
+    return titleVal;
+  }
+
+  const t = sec.title.toLowerCase();
+  const isAudioOrSub =
+    t.startsWith("ауд") ||
+    t.startsWith("audio") ||
+    t.startsWith("субт") ||
+    t.startsWith("sub") ||
+    t.startsWith("текст") ||
+    t.startsWith("text") ||
+    t.startsWith("音频") ||
+    t.startsWith("字幕") ||
+    t.startsWith("文本");
+
+  if (isAudioOrSub) {
+    if (langVal && formatVal) return `${langVal} (${formatVal})`;
+    if (langVal) return langVal;
+    if (formatVal) return formatVal;
+  }
+
+  return undefined;
 }
 
 /** Парсинг и структурирование строк отчёта MediaInfo */
@@ -430,9 +514,10 @@ export function parseMediaInfoLines(rawText: string, lang: MediaInfoLang = "en")
     }
   }
 
-  // Формирование структурированного чистого текста для каждой категории
+  // 为每个分类生成结构化纯文本，并提取分区标题
   for (const sec of sections) {
-    const secLines = [sec.title];
+    sec.streamTitle = extractSectionStreamTitle(sec, lang);
+    const secLines = [sec.streamTitle ? `${sec.title} — ${sec.streamTitle}` : sec.title];
     for (const r of sec.rows) {
       if (r.cleanText) {
         secLines.push(r.cleanText);
