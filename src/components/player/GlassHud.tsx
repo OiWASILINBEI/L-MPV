@@ -14,6 +14,8 @@ import {
   Languages,
   Film,
   Sun,
+  Play,
+  Pause,
 } from "lucide-react";
 
 /**
@@ -40,98 +42,176 @@ function getHudIcon(text: string, isError: boolean): React.ReactNode {
     return <AlertCircle size={18} className="glass-hud__icon glass-hud__icon--error" />;
   }
   const lower = text.toLowerCase();
+  const has = (...words: string[]) => words.some((w) => lower.includes(w));
+
   if (
-    lower.includes("ошибка") ||
-    lower.includes("error") ||
-    lower.includes("fail") ||
-    lower.includes("не удалось") ||
-    lower.includes("не найден")
+    has(
+      "ошибка",
+      "error",
+      "fail",
+      "не удалось",
+      "не найден",
+      // 中文错误提示（简体中文汉化）
+      "错误",
+      "出错",
+      "失败",
+      "未找到",
+      "无法",
+      "不可用"
+    )
   ) {
     return <AlertCircle size={18} className="glass-hud__icon glass-hud__icon--error" />;
   }
   if (
-    lower.includes("аудио") ||
-    lower.includes("audio") ||
-    lower.includes("звук") ||
-    lower.includes("sound") ||
-    lower.includes("громкост")
+    has(
+      "аудио",
+      "audio",
+      "звук",
+      "sound",
+      "громкост",
+      // 中文音量/音频提示（简体中文汉化）
+      "音量",
+      "静音",
+      "音轨",
+      "音频",
+      "声音"
+    )
   ) {
     return <Volume2 size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
   if (
-    lower.includes("субтитр") ||
-    lower.includes("sub") ||
-    lower.includes("subtitle")
+    has(
+      "субтитр",
+      "sub",
+      "subtitle",
+      // 中文字幕提示（简体中文汉化）
+      "字幕"
+    )
   ) {
     return <Subtitles size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
   if (
-    lower.includes("скорост") ||
-    lower.includes("speed") ||
+    has(
+      "скорост",
+      "speed",
+      // 中文倍速提示（简体中文汉化）
+      "播放速度",
+      "倍速"
+    ) ||
     /^\d+(\.\d+)?x$/.test(lower.trim())
   ) {
     return <Zap size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
+  if (/^播放$/.test(text.trim())) {
+    return <Play size={18} className="glass-hud__icon glass-hud__icon--accent" />;
+  }
+  if (/^暂停$/.test(text.trim())) {
+    return <Pause size={18} className="glass-hud__icon glass-hud__icon--accent" />;
+  }
   if (
-    lower.includes("скриншот") ||
-    lower.includes("screenshot")
+    has(
+      "скриншот",
+      "screenshot",
+      // 中文截图/帧提示（简体中文汉化）
+      "截图",
+      "帧"
+    )
   ) {
     return <Camera size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
   if (
-    lower.includes("кадр") ||
-    lower.includes("frame") ||
+    has(
+      "кадр",
+      "frame",
+      // 中文章节/正在播放提示（简体中文汉化）
+      "章节",
+      "正在播放"
+    ) ||
     /^\d+\s*\/\s*\d+$/.test(lower.trim())
   ) {
     return <Film size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
   if (
-    lower.includes("поворот") ||
-    lower.includes("rotation") ||
-    lower.includes("rotate")
+    has(
+      "поворот",
+      "rotation",
+      "rotate",
+      // 中文旋转提示（简体中文汉化）
+      "旋转"
+    )
   ) {
     return <RotateCw size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
   if (
-    lower.includes("зум") ||
-    lower.includes("zoom") ||
-    lower.includes("масштаб")
+    has(
+      "зум",
+      "zoom",
+      "масштаб",
+      // 中文缩放提示（简体中文汉化）
+      "缩放"
+    )
   ) {
     return <Maximize size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
   if (
-    lower.includes("повтор") ||
-    lower.includes("repeat") ||
-    lower.includes("loop")
+    has(
+      "повтор",
+      "repeat",
+      "loop",
+      // 中文循环提示（简体中文汉化）
+      "循环",
+      "重复"
+    )
   ) {
     return <Repeat size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
   if (
-    lower.includes("визуализатор") ||
-    lower.includes("visualizer")
+    has(
+      "визуализатор",
+      "visualizer",
+      // 中文可视化提示（简体中文汉化）
+      "可视化"
+    )
   ) {
     return <Activity size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
   if (
-    lower.includes("blur") ||
-    lower.includes("ambient")
+    has(
+      "blur",
+      "ambient",
+      // 中文环境光提示（简体中文汉化）
+      "环境光",
+      "模糊"
+    )
   ) {
     return <Sun size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
   if (
-    lower.includes("язык") ||
-    lower.includes("language")
+    has(
+      "язык",
+      "language",
+      // 中文语言提示（简体中文汉化）
+      "语言"
+    )
   ) {
     return <Languages size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
   if (
-    lower.includes("upscal") ||
-    lower.includes("апскейл") ||
-    lower.includes("4k ai") ||
-    lower.includes("пресет") ||
-    lower.includes("стиль") ||
-    lower.includes("preset") ||
-    lower.includes("тема")
+    has(
+      "upscal",
+      "апскейл",
+      "4k ai",
+      "пресет",
+      "стиль",
+      "preset",
+      "тема",
+      // 中文超分/预设提示（简体中文汉化）
+      "超分",
+      "预设",
+      "风格",
+      "样式",
+      "主题"
+    )
   ) {
     return <Sparkles size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
