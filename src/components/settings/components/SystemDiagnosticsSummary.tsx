@@ -47,8 +47,16 @@ function openFolder(path: string) {
 }
 
 export function SystemDiagnosticsSummary({ info, loading, copied, onRefresh, onCopy, actions, embedded = false }: Props) {
-  const { dict } = useTranslation();
+  const { dict, locale } = useTranslation();
   const f = dict.settings.systemFields;
+  /** 后端 sysinfo 返回的状态文案本地化（简体中文汉化）。 */
+  const localizeStatus = (value: string): string => {
+    const pick = (zh: string, en: string) => (locale === "zh" ? zh : locale === "en" ? en : value);
+    if (value === "libmpv-2.dll (активен)") return pick("libmpv-2.dll（已启用）", "libmpv-2.dll (active)");
+    if (value === "Не загружен") return pick("未加载", "Not loaded");
+    if (value === "FFmpeg установлен (версия не определена)") return pick("FFmpeg 已安装（版本未确定）", "FFmpeg installed (version unknown)");
+    return value;
+  };
   const installed = info ? [
     info.tensorrt_available && "TensorRT 11",
     info.directml_available && "DirectML",
@@ -72,7 +80,7 @@ export function SystemDiagnosticsSummary({ info, loading, copied, onRefresh, onC
       <DiagnosticRow icon={<HardDrive size={14} aria-hidden />} label={f.libmpvTitle}
         status={info.libmpv_available ? "ok" : "bad"}
         path={info.libmpv_path} onOpenFolder={() => openFolder(info.libmpv_path)}>
-        <span>{info.libmpv_available ? info.libmpv_version : f.libmpvMissing}</span>
+        <span>{info.libmpv_available ? localizeStatus(info.libmpv_version) : f.libmpvMissing}</span>
         {info.libmpv_has_animejanai && <span className="system-settings__badge" title={f.animejanaiCompiled}>
           <CheckCircle2 size={11} aria-hidden />vf_animejanai
         </span>}
@@ -80,7 +88,7 @@ export function SystemDiagnosticsSummary({ info, loading, copied, onRefresh, onC
       <DiagnosticRow icon={<Cpu size={14} aria-hidden />} label={f.ffmpegTitle}
         status={info.ffmpeg_available ? "ok" : "bad"}
         path={info.ffmpeg_path} onOpenFolder={() => openFolder(info.ffmpeg_path)}>
-        {info.ffmpeg_available ? ffmpeg : f.statusMissing}
+        {info.ffmpeg_available ? localizeStatus(ffmpeg || "") : f.statusMissing}
       </DiagnosticRow>
       <DiagnosticRow icon={<FileText size={14} aria-hidden />} label={f.mediainfoTitle}
         status={info.mediainfo_available ? "ok" : "bad"}
@@ -101,7 +109,7 @@ export function SystemDiagnosticsSummary({ info, loading, copied, onRefresh, onC
       </DiagnosticRow>
       <DiagnosticRow icon={<Layers size={14} aria-hidden />} label={f.webview2Title}
         status={info.webview2_version && info.webview2_version !== "unknown" && info.webview2_version !== "Не определён" ? "ok" : "warn"}>
-        <span>{info.webview2_version && info.webview2_version !== "unknown" ? info.webview2_version : "—"}</span>
+        <span>{info.webview2_version && info.webview2_version !== "unknown" && info.webview2_version !== "Не определён" ? info.webview2_version : "—"}</span>
 
       </DiagnosticRow>
       <DiagnosticRow icon={<HardDrive size={14} aria-hidden />} label={f.diskTitle}

@@ -16,6 +16,12 @@ import {
   Sun,
   Play,
   Pause,
+  Shuffle,
+  Pin,
+  Clock,
+  Flame,
+  Layout,
+  SlidersHorizontal,
 } from "lucide-react";
 
 /**
@@ -43,6 +49,10 @@ function getHudIcon(text: string, isError: boolean): React.ReactNode {
   }
   const lower = text.toLowerCase();
   const has = (...words: string[]) => words.some((w) => lower.includes(w));
+
+  if (has("按钮「")) {
+    return <SlidersHorizontal size={18} className="glass-hud__icon glass-hud__icon--accent" />;
+  }
 
   if (
     has(
@@ -107,6 +117,9 @@ function getHudIcon(text: string, isError: boolean): React.ReactNode {
   }
   if (/^暂停$/.test(text.trim())) {
     return <Pause size={18} className="glass-hud__icon glass-hud__icon--accent" />;
+  }
+  if (has("随机播放", "shuffle")) {
+    return <Shuffle size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
   if (
     has(
@@ -175,6 +188,9 @@ function getHudIcon(text: string, isError: boolean): React.ReactNode {
   ) {
     return <Activity size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
+  if (has("热力图", "heatmap")) {
+    return <Flame size={18} className="glass-hud__icon glass-hud__icon--accent" />;
+  }
   if (
     has(
       "blur",
@@ -196,6 +212,9 @@ function getHudIcon(text: string, isError: boolean): React.ReactNode {
   ) {
     return <Languages size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
+  if (has("控制栏样式")) {
+    return <Layout size={18} className="glass-hud__icon glass-hud__icon--accent" />;
+  }
   if (
     has(
       "upscal",
@@ -214,6 +233,12 @@ function getHudIcon(text: string, isError: boolean): React.ReactNode {
     )
   ) {
     return <Sparkles size={18} className="glass-hud__icon glass-hud__icon--accent" />;
+  }
+  if (has("置顶", "always on top", "pin")) {
+    return <Pin size={18} className="glass-hud__icon glass-hud__icon--accent" />;
+  }
+  if (has("时间：", "格式：", "time:", "format:")) {
+    return <Clock size={18} className="glass-hud__icon glass-hud__icon--accent" />;
   }
   return <Info size={18} className="glass-hud__icon" />;
 }

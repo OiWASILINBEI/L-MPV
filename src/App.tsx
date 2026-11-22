@@ -1124,7 +1124,7 @@ function App() {
 
             const isHideModelNames = localStorage.getItem("l-mpv-hide-model-names") === "true";
             const modelTitle = isHideModelNames
-              ? (curLocale === "en" ? "Favorite model" : "Избранная модель")
+              ? (curLocale === "en" ? "Favorite model" : curLocale === "zh" ? "收藏模型" : "Избранная модель")
               : targetModel.display_name;
             triggerOsd(dict.osd.upscaleModel(modelTitle), 2000);
           }

@@ -1,4 +1,10 @@
 import { saveAmbientSettings } from "./ambientPreviewQueue";
+
+/** 按当前界面语言选择预设相关文案（简体中文汉化）。 */
+function presetText(ru: string, en: string, zh: string): string {
+  const locale = getEffectiveLocale();
+  return locale === "zh" ? zh : locale === "en" ? en : ru;
+}
 // ─── Утилиты управления пресетами настроек L-MPV ──────────────
 // Данный модуль обеспечивает создание снимков текущих настроек,
 // их портативное сохранение в config/presets.json и localStorage,
@@ -781,11 +787,15 @@ export async function exportPresetToFile(preset: SettingsPreset): Promise<string
 
   try {
     const selectedPath = await save({
-      title: `Экспорт пресета «${preset.name}»`,
+      title: presetText(
+        `Экспорт пресета «${preset.name}»`,
+        `Export preset "${preset.name}"`,
+        `导出预设「${preset.name}」`,
+      ),
       defaultPath: defaultFileName,
       filters: [
         {
-          name: "Пресет L-MPV (*.json)",
+          name: presetText("Пресет L-MPV (*.json)", "L-MPV preset (*.json)", "L-MPV 预设 (*.json)"),
           extensions: ["json"],
         },
       ],
@@ -813,11 +823,11 @@ export async function exportAllPresetsToFile(presets: SettingsPreset[]): Promise
 
   try {
     const selectedPath = await save({
-      title: "Экспорт всех пресетов настроек",
+      title: presetText("Экспорт всех пресетов настроек", "Export all settings presets", "导出全部设置预设"),
       defaultPath: defaultFileName,
       filters: [
         {
-          name: "Пресеты L-MPV (*.json)",
+          name: presetText("Пресеты L-MPV (*.json)", "L-MPV presets (*.json)", "L-MPV 预设 (*.json)"),
           extensions: ["json"],
         },
       ],
@@ -841,12 +851,12 @@ export async function exportAllPresetsToFile(presets: SettingsPreset[]): Promise
 export async function importPresetsFromNativeDialog(): Promise<SettingsPreset[]> {
   try {
     const selectedPath = await open({
-      title: "Выберите файл пресета для импорта (.json)",
+      title: presetText("Выберите файл пресета для импорта (.json)", "Select a preset file to import (.json)", "选择要导入的预设文件（.json）"),
       multiple: false,
       directory: false,
       filters: [
         {
-          name: "Файлы пресетов (*.json)",
+          name: presetText("Файлы пресетов (*.json)", "Preset files (*.json)", "预设文件 (*.json)"),
           extensions: ["json"],
         },
       ],
@@ -887,11 +897,11 @@ export function parseImportedPresets(jsonString: string): SettingsPreset[] {
     for (const item of list) {
       if (!item || typeof item !== "object") continue;
       const d = (item.data && typeof item.data === "object") ? item.data : item;
-      const rawName = typeof item.name === "string" ? item.name : "Импортированный пресет";
+      const rawName = typeof item.name === "string" ? item.name : presetText("Импортированный пресет", "Imported preset", "导入的预设");
 
       valid.push({
         id: `preset_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        name: `${rawName.replace(/\s*\(Импорт\)\s*/g, "")} (Импорт)`,
+        name: `${rawName.replace(/\s*\((?:Импорт|Imported|导入)\)\s*/g, "")} ${presetText("(Импорт)", "(Imported)", "（导入）")}`,
         createdAt: Date.now(),
         isBuiltIn: false,
         data: {
@@ -935,7 +945,7 @@ export function parseImportedPresets(jsonString: string): SettingsPreset[] {
     }
     return valid;
   } catch (e) {
-    throw new Error("Неверный формат JSON файла пресета");
+    throw new Error(presetText("Неверный формат JSON файла пресета", "Invalid preset JSON file", "预设 JSON 文件格式无效"));
   }
 }
 

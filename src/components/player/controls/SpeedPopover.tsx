@@ -58,7 +58,7 @@ export const SpeedPopover: React.FC<SpeedPopoverProps> = ({
   onSelectSpeed,
   onClose,
 }) => {
-  const { dict } = useTranslation();
+  const { dict, locale } = useTranslation();
   const [popoverPosStyle, setPopoverPosStyle] = useState<React.CSSProperties>({});
 
   // Вычисление точной горизонтальной позиции окна строго над кнопкой скорости
@@ -178,8 +178,8 @@ export const SpeedPopover: React.FC<SpeedPopoverProps> = ({
               e.stopPropagation();
               onClose();
             }}
-            title="Закрыть"
-            aria-label="Закрыть"
+            title={locale === "zh" ? "关闭" : locale === "en" ? "Close" : "Закрыть"}
+            aria-label={locale === "zh" ? "关闭" : locale === "en" ? "Close" : "Закрыть"}
           >
             <X size={14} />
           </button>

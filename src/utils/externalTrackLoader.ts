@@ -54,7 +54,7 @@ async function loadExternalTrack(
   if (!hasMedia) return false;
 
   const isAudio = kind === "audio";
-  const filterName = isAudio ? dict.controls.audioFilter : "Subtitles";
+  const filterName = isAudio ? dict.controls.audioFilter : dict.controls.subtitles;
   const extensions = isAudio ? [...AUDIO_TRACK_EXTENSIONS] : [...SUBTITLE_TRACK_EXTENSIONS];
   const command = isAudio ? "load_audio_file" : "load_subtitle_file";
 

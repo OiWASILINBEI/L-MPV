@@ -115,6 +115,7 @@ class GlobalErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       const isRu = typeof navigator !== "undefined" && (navigator.language?.toLowerCase().startsWith("ru") || false);
+      const isZh = typeof navigator !== "undefined" && (navigator.language?.toLowerCase().startsWith("zh") || false);
       return (
         <div
           style={{
@@ -128,7 +129,7 @@ class GlobalErrorBoundary extends React.Component<
           }}
           >
           <h2 style={{ margin: "0 0 12px 0", color: "#ef4444" }}>
-            {isRu ? "Ошибка отображения компонента" : "Component Rendering Error"}
+            {isRu ? "Ошибка отображения компонента" : isZh ? "组件渲染出错" : "Component Rendering Error"}
           </h2>
           <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
             {this.state.error?.message}
@@ -148,7 +149,7 @@ class GlobalErrorBoundary extends React.Component<
               cursor: "pointer",
             }}
             >
-            {isRu ? "Перезагрузить" : "Reload"}
+            {isRu ? "Перезагрузить" : isZh ? "重新加载" : "Reload"}
           </button>
         </div>
       );

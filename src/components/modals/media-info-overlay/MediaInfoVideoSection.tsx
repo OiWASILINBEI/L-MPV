@@ -31,7 +31,7 @@ export const MediaInfoVideoSection: React.FC<MediaInfoVideoSectionProps> = ({
   droppedFrames,
 }) => {
   const { dict, locale } = useTranslation();
-  const numberLocale = locale === "en" ? "en-US" : "ru-RU";
+  const numberLocale = locale === "en" ? "en-US" : locale === "zh" ? "zh-CN" : "ru-RU";
 
   const hasVideo = Boolean(
     mediaInfo?.has_video ||

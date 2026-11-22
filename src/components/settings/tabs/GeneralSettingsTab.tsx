@@ -83,23 +83,23 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
   const isRu = locale === "ru";
 
   const deinterlaceLabels = useMemo<Record<(typeof DEINTERLACE_OPTIONS)[number], string>>(() => ({
-    no: isRu ? "Выкл" : "Off",
-    auto: isRu ? "Авто" : "Auto",
+    no: isRu ? "Выкл" : locale === "zh" ? "关闭" : "Off",
+    auto: isRu ? "Авто" : locale === "zh" ? "自动" : "Auto",
     yadif: "Yadif",
     yadif2x: "2x",
-  }), [isRu]);
+  }), [isRu, locale]);
 
   const hwdecLabels = useMemo<Record<(typeof HWDEC_OPTIONS)[number], string>>(() => ({
     "auto-safe": "Auto Safe",
     "auto-copy": "Auto Copy",
-    no: isRu ? "Прог." : "SW",
-  }), [isRu]);
+    no: isRu ? "Прог." : locale === "zh" ? "软解" : "SW",
+  }), [isRu, locale]);
 
   const debandPresetLabels = useMemo<Record<(typeof DEBAND_PRESET_OPTIONS)[number], string>>(() => ({
-    light: isRu ? "Лёгкий" : "Light",
-    balanced: isRu ? "Сбаланс." : "Balanced",
-    strong: isRu ? "Сильный" : "Strong",
-  }), [isRu]);
+    light: isRu ? "Лёгкий" : locale === "zh" ? "轻度" : "Light",
+    balanced: isRu ? "Сбаланс." : locale === "zh" ? "均衡" : "Balanced",
+    strong: isRu ? "Сильный" : locale === "zh" ? "强力" : "Strong",
+  }), [isRu, locale]);
 
   // ── Состояние настроек оптимизации видео/аудио ──
   const [volumeOsd, setVolumeOsdState] = useState(isVolumeOsdEnabled);

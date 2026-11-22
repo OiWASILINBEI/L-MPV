@@ -22,7 +22,7 @@ export const MediaInfoTabs: React.FC<MediaInfoTabsProps> = ({
   activeTab,
   onTabChange,
 }) => {
-  const { dict } = useTranslation();
+  const { dict, locale } = useTranslation();
   const lastWheelTimeRef = useRef<number>(0);
 
   const tabs: Array<{ id: MediaInfoOverlayTab; label: string }> = [
@@ -55,7 +55,7 @@ export const MediaInfoTabs: React.FC<MediaInfoTabsProps> = ({
     <SelectionRail activeKey={activeTab}
       className="media-info__tabs"
       role="tablist"
-      aria-label="Вкладки медиаинформации"
+      aria-label={locale === "ru" ? "Вкладки медиаинформации" : locale === "zh" ? "媒体信息标签页" : "Media info tabs"}
       onWheel={handleWheel}
     >
       {tabs.map((tab) => {

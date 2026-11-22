@@ -24,7 +24,7 @@ export const MediaInfoAudioSection: React.FC<MediaInfoAudioSectionProps> = ({
   currentVolume,
 }) => {
   const { dict, locale } = useTranslation();
-  const numberLocale = locale === "en" ? "en-US" : "ru-RU";
+  const numberLocale = locale === "en" ? "en-US" : locale === "zh" ? "zh-CN" : "ru-RU";
 
   const channelsCount = Number(mediaInfo?.audio_channels);
   const validChannels =

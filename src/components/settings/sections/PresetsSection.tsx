@@ -462,7 +462,7 @@ export const PresetsSection: React.FC<PresetsSectionProps> = ({ onPresetApplied 
   // Форматирование даты
   const formatDate = (timestamp: number): string => {
     try {
-      const dateLocale = locale === "en" ? "en-US" : "ru-RU";
+      const dateLocale = locale === "en" ? "en-US" : locale === "zh" ? "zh-CN" : "ru-RU";
       return new Date(timestamp).toLocaleDateString(dateLocale, {
         day: "numeric",
         month: "short",

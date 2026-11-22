@@ -15,11 +15,12 @@ interface MarkdownRendererProps {
  */
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, className = "" }) => {
   const isRu = getEffectiveLocale() === "ru";
+  const isZh = getEffectiveLocale() === "zh";
 
   if (!content || !content.trim()) {
     return (
       <div style={{ color: "var(--text-muted, #9ca3af)", fontStyle: "italic", fontSize: "var(--fs-base)" }}>
-        {isRu ? "Описание изменений отсутствует." : "No changelog description provided."}
+        {isRu ? "Описание изменений отсутствует." : isZh ? "暂无更新说明。" : "No changelog description provided."}
       </div>
     );
   }
@@ -143,7 +144,8 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
         }
       }
 
-      let summary = "Подробнее / Details";
+      const detailLocale = getEffectiveLocale();
+      let summary = detailLocale === "zh" ? "详情" : detailLocale === "ru" ? "Подробнее / Details" : "Details";
       const fullDetailText = detailLines.join("\n");
       const summaryMatch = fullDetailText.match(/<summary\b[^>]*>(.*?)<\/summary>/is);
 
@@ -658,6 +660,7 @@ function RenderBlock({ block }: { block: MarkdownBlock }): React.ReactElement | 
 
 const MarkdownImage: React.FC<{ src: string; alt: string; linkUrl?: string }> = ({ src, alt, linkUrl }) => {
   const isRu = getEffectiveLocale() === "ru";
+  const isZh = getEffectiveLocale() === "zh";
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const normalizedSrc = normalizeImageUrl(src);
@@ -685,10 +688,10 @@ const MarkdownImage: React.FC<{ src: string; alt: string; linkUrl?: string }> = 
           fontSize: "var(--fs-sm)",
           cursor: "pointer",
         }}
-        title={isRu ? "Нажмите, чтобы открыть изображение в браузере" : "Click to open image in browser"}
+        title={isRu ? "Нажмите, чтобы открыть изображение в браузере" : isZh ? "点击在浏览器中打开图片" : "Click to open image in browser"}
         >
         <ImageIcon size={16} color="var(--accent, #60a5fa)" />
-        <span>{isRu ? "Изображение:" : "Image:"} {alt || (isRu ? "Посмотреть в браузере" : "View in browser")}</span>
+        <span>{isRu ? "Изображение:" : isZh ? "图片：" : "Image:"} {alt || (isRu ? "Посмотреть в браузере" : isZh ? "在浏览器中查看" : "View in browser")}</span>
         <ExternalLink size={12} style={{ opacity: 0.7 }} />
       </div>
     );
@@ -698,12 +701,12 @@ const MarkdownImage: React.FC<{ src: string; alt: string; linkUrl?: string }> = 
     <div style={{ margin: "10px 0", position: "relative" }}>
       <img
         src={normalizedSrc}
-        alt={alt || (isRu ? "Изображение релиза" : "Release image")}
+        alt={alt || (isRu ? "Изображение релиза" : isZh ? "发布图片" : "Release image")}
         loading="lazy"
         onLoad={() => setIsLoading(false)}
         onError={() => setHasError(true)}
         onClick={handleClick}
-        title={linkUrl ? (isRu ? `Открыть ссылку: ${linkUrl}` : `Open link: ${linkUrl}`) : (isRu ? "Нажмите, чтобы открыть изображение в полном размере" : "Click to open image in full size")}
+        title={linkUrl ? (isRu ? `Открыть ссылку: ${linkUrl}` : isZh ? `打开链接：${linkUrl}` : `Open link: ${linkUrl}`) : (isRu ? "Нажмите, чтобы открыть изображение в полном размере" : isZh ? "点击查看完整尺寸图片" : "Click to open image in full size")}
         style={{
           maxWidth: "100%",
           maxHeight: "360px",
@@ -805,7 +808,7 @@ const renderLink = (url: string, label: string | React.ReactNode, key: string, h
       wordBreak: "break-all",
     }}
     className="hover-bright"
-    title={getEffectiveLocale() === "ru" ? `Перейти: ${url}` : `Open: ${url}`}
+    title={getEffectiveLocale() === "ru" ? `Перейти: ${url}` : getEffectiveLocale() === "zh" ? `打开：${url}` : `Open: ${url}`}
     >
     <span>{label}</span>
     {hasIcon && <ExternalLink size={11} style={{ opacity: 0.8 }} />}
