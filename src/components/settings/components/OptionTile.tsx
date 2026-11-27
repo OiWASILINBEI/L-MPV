@@ -1,7 +1,7 @@
 import React from "react";
 import { RotateCcw } from "lucide-react";
 import { SettingsIcon } from "./SettingsIcon";
-import { optionCardStyle, optionResetBtnStyle } from "./optionCardStyles";
+import { optionCardStyle } from "./optionCardStyles";
 
 /**
  * Компактные тайлы настроек в едином стиле «Настроек интерфейса».
@@ -96,16 +96,17 @@ export function OptionBlock({
       {title && (
         <div style={blockHeaderStyle}>
           <span style={blockTitleTextStyle}>{title}</span>
-          {showReset && onReset && (
+          {resetValue !== undefined && onReset && (
             <button
               type="button"
-              className="btn btn--secondary btn--sm"
-              style={optionResetBtnStyle}
+              className="ui-reset-btn"
+              data-reset-hidden={!showReset}
               onClick={onReset}
-
+              disabled={disabled || !showReset}
+              tabIndex={disabled || !showReset ? -1 : 0}
               aria-label={resetTitle}
-              >
-              <RotateCcw size={14} />
+            >
+              <RotateCcw size={16} />
             </button>
           )}
         </div>
@@ -179,16 +180,17 @@ export function OptionToggleRow({
         />
         <span className="option-toggle-row__text">{label}</span>
       </label>
-      {showReset && (
+      {resetValue !== undefined && onReset && (
         <button
           type="button"
-          className="btn btn--secondary btn--sm"
-          style={optionResetBtnStyle}
+          className="ui-reset-btn"
+          data-reset-hidden={!showReset}
           onClick={onReset}
-
+          disabled={disabled || !showReset}
+          tabIndex={disabled || !showReset ? -1 : 0}
           aria-label={resetTitle}
-          >
-          <RotateCcw size={14} />
+        >
+          <RotateCcw size={16} />
         </button>
       )}
     </div>
@@ -203,7 +205,7 @@ const cardHeaderStyle: React.CSSProperties = {
   alignItems: "flex-start",
   minHeight: 20,
   lineHeight: "20px",
-  gap: 6,
+  gap: 12,
   minWidth: 0,
 };
 
@@ -225,7 +227,7 @@ const cardBodyStyle: React.CSSProperties = {
 };
 
 const blockHeaderStyle: React.CSSProperties = {
-  minHeight: "var(--size-action-compact)",
+  minHeight: 24,
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",

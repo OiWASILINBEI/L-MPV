@@ -1,11 +1,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useOverlayDismiss } from "../../hooks/useOverlayDismiss";
+import { CopyCheckMorphIcon } from "../common/CopyCheckMorphIcon";
 import {
   FileText,
   X,
-  Copy,
-  Check,
   Download,
   Search,
   Loader2,
@@ -30,7 +29,7 @@ import { getCustomHotkeys, isKeyboardEventMatch } from "../../utils/hotkeyUtils"
 import {
   getSavedControlBarStyle,
   type ControlBarStyle,
-} from "../../utils/controlBarStyleUtils";
+} from "../../theme/controlBarStyle";
 
 interface DetailedMediaInfoModalProps {
   isOpen: boolean;
@@ -373,7 +372,7 @@ export function DetailedMediaInfoModal({
             aria-label={dict.detailedMediaInfoModal.copyReport}
             disabled={!baseReport.rawText}
             >
-            {copied ? <Check size={14} color="var(--success-text)" /> : <Copy size={14} />}
+            <CopyCheckMorphIcon copied={copied} size={15} />
           </button>
 
           {/* Экспорт в TXT */}
@@ -396,7 +395,7 @@ export function DetailedMediaInfoModal({
 
             aria-label={dict.detailedMediaInfoModal.close}
             >
-            <X size={16} strokeWidth={2} />
+            <X size={16} strokeWidth={2.4} />
           </button>
         </div>
       </div>

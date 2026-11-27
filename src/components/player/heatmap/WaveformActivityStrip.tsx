@@ -19,6 +19,7 @@ import { usePlayerState, usePlayerProgress } from "../../../contexts/PlayerState
 import { useTranslation } from "../../../i18n/LanguageContext";
 import { createHeatmapDisplayCache } from "./heatmapDisplay";
 import { getVisualizerConfig } from "../AudioVisualizer";
+import { notifyLiquidGlassSync } from "../../../theme/liquidGlass/LiquidGlassSync";
 import {
   timelineScrubSync,
   TimelineScrubState,
@@ -126,6 +127,8 @@ export const WaveformActivityStrip: React.FC<WaveformActivityStripProps> = React
   onHoverChangeRef.current = onHoverChange;
 
   const mediaPath = mediaInfo?.path;
+  // 在线流（http/https）无法做码率波形分析，直接跳过，不弹“指标不可用”
+  const isRemoteStream = /^https?:\/\//i.test(mediaPath ?? "");
 
   // Определение активной аудиодорожки (встроенной или внешней)
   const activeAudioTrack = useMemo(() => {
@@ -223,8 +226,6 @@ export const WaveformActivityStrip: React.FC<WaveformActivityStripProps> = React
 
   // 2. Управляемая загрузка профиля данных с защитой от поздних ответов и гонок отмены
   useEffect(() => {
-    // 在线流（http/https）无法做码率波形分析，直接跳过，不弹“指标不可用”
-    const isRemoteStream = /^https?:\/\//i.test(mediaPath ?? "");
     if (!mediaPath || !heatmapConfig.enabled || isRemoteStream) {
       setHeatmapResponse(null);
       setSamples(null);
@@ -570,6 +571,15 @@ export const WaveformActivityStrip: React.FC<WaveformActivityStripProps> = React
     return () => { window.dispatchEvent(new Event("l-mpv-timeline-layout-changed")); };
   }, [heatmapConfig.enabled, isVisible, isAboveTimeline, isAboveVisualizer]);
 
+  const badgeVisible = Boolean(hoverMetrics && hoverRatio !== null);
+  useLayoutEffect(() => {
+    if (!badgeVisible) return;
+    notifyLiquidGlassSync();
+    return () => {
+      queueMicrotask(notifyLiquidGlassSync);
+    };
+  }, [badgeVisible, hoverRatio]);
+
   if (!heatmapConfig.enabled) {
     return null;
   }
@@ -592,7 +602,7 @@ export const WaveformActivityStrip: React.FC<WaveformActivityStripProps> = React
         isAboveVisualizer ? "waveform-activity-strip--above-visualizer" : ""
       } ${className}`}
       style={{
-        height: `${heatmapConfig.height || 24}px`,
+        height: `${heatmapConfig.height || 34}px`,
         opacity: isVisible ? heatmapConfig.opacity : 0,
       }}
       onPointerEnter={handlePointerEnter}

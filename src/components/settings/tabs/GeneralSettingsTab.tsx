@@ -27,11 +27,12 @@ const DEINTERLACE_OPTIONS = ["no", "auto", "yadif", "yadif2x"] as const;
 
 const HWDEC_OPTIONS = ["auto-safe", "auto-copy", "no"] as const;
 
-const AUDIO_NORMALIZE_OPTIONS = ["no", "dynaudnorm", "loudnorm"] as const;
+const AUDIO_NORMALIZE_OPTIONS = ["no", "dynaudnorm", "loudnorm", "ebu128"] as const;
 const AUDIO_NORMALIZE_KEY_MAP = {
   no: "audioNormalizeOff",
   dynaudnorm: "audioNormalizeDyn",
   loudnorm: "audioNormalizeLoud",
+  ebu128: "audioNormalizeEbu128",
 } as const;
 const DEBAND_PRESET_OPTIONS = ["light", "balanced", "strong"] as const;
 
@@ -104,6 +105,7 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
   // ── Состояние настроек оптимизации видео/аудио ──
   const [volumeOsd, setVolumeOsdState] = useState(isVolumeOsdEnabled);
   const [audioLimiter, setAudioLimiter] = useState(true);
+  const [audioSettingsPending, setAudioSettingsPending] = useState(true);
   const [volumeIndicatorEnabled, setVolumeIndicatorEnabledState] = useState(isVolumeIndicatorEnabled);
   const [debandEnabled, setDebandEnabled] = useState(false);
   const [debandPreset, setDebandPreset] = useState("balanced");
@@ -152,7 +154,8 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
       })
       .catch(() => {
         // Бэкенд недоступен — оставляем дефолты
-      });
+      })
+      .finally(() => setAudioSettingsPending(false));
   }, []);
 
   // ── Применение настроек видео/аудио с откатом состояния ──
@@ -189,16 +192,29 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
     [hwdecMode, runSetting],
   );
 
-  const selectAudioNormalize = useCallback(
-    (mode: string) => {
-      const prev = audioNormalize;
-      setAudioNormalize(mode);
-      void runSetting("нормализация звука", () => invoke("set_audio_normalize_setting", { mode }), () => setAudioNormalize(prev));
+  const applyAudioSetting = useCallback(
+    async (apply: () => Promise<unknown>, commit: () => void) => {
+      if (audioSettingsPending) return;
+      setAudioSettingsPending(true);
+      try {
+        await apply();
+        commit();
+      } catch (error) {
+        console.error("Ошибка применения настройки аудиотракта", error);
+      } finally {
+        setAudioSettingsPending(false);
+      }
     },
-    [audioNormalize, runSetting],
+    [audioSettingsPending],
   );
 
-
+  const selectAudioNormalize = (mode: string) => {
+    if (mode === audioNormalize) return;
+    void applyAudioSetting(
+      () => invoke("set_audio_normalize_setting", { mode }),
+      () => setAudioNormalize(mode),
+    );
+  };
 
   const selectDebandPreset = useCallback(
     (preset: string) => {
@@ -218,14 +234,12 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
     [demuxerCacheMb, runSetting],
   );
 
-  const setAudioLimiterSafe = useCallback(
-    (enabled: boolean) => {
-      const prev = audioLimiter;
-      setAudioLimiter(enabled);
-      void runSetting("лимитер аудио", () => invoke("set_audio_limiter_setting", { enabled }), () => setAudioLimiter(prev));
-    },
-    [audioLimiter, runSetting],
-  );
+  const setAudioLimiterSafe = (enabled: boolean) => {
+    void applyAudioSetting(
+      () => invoke("set_audio_limiter_setting", { enabled }),
+      () => setAudioLimiter(enabled),
+    );
+  };
 
   const setDebandEnabledSafe = useCallback(
     (enabled: boolean) => {
@@ -275,7 +289,7 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
               title={dict.settings.general.languageTitle}
               desc={dict.settings.general.languageDesc}
             />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginTop: "var(--space-2)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-4)", marginTop: "var(--space-2)" }}>
               <button
                 type="button"
                 className={`compact-segment-btn ${locale === "ru" ? "compact-segment-btn--active" : ""}`}
@@ -457,19 +471,15 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
               <button
                 type="button"
                 onClick={handleResetDefault}
-                className="btn btn--secondary btn--icon"
+                className="ui-reset-btn"
                 style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "var(--radius-sm)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
+                  width: 28,
+                  height: 28,
+                  minWidth: 28,
+                  minHeight: 28,
                 }}
-
-                >
-                <RotateCcw size={13} />
+              >
+                <RotateCcw size={16} />
               </button>
             </div>
           </div>
@@ -901,6 +911,7 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
             >
             <OptionToggleRow
               checked={audioLimiter}
+              disabled={audioSettingsPending}
               resetValue
               resetTitle={dict.settings.general.audioLimiterTitle}
               onReset={() => setAudioLimiterSafe(true)}
@@ -912,7 +923,8 @@ export function GeneralSettingsTab(props: GeneralSettingsTabProps) {
             <OptionBlock
               title={dict.settings.general.audioNormalizeTitle}
               value={audioNormalize}
-              columns="1fr 1fr 1fr"
+              disabled={audioSettingsPending}
+              columns="repeat(4, minmax(0, 1fr))"
               resetValue="no"
               resetTitle={dict.settings.general.resetAudioNormalize}
               onReset={() => selectAudioNormalize("no")}

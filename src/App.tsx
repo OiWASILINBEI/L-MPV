@@ -1,3 +1,4 @@
+import { useVideoZoom } from "./hooks/useVideoZoom";
 import { AnimatePresence } from "motion/react";
 import { toggleAmbientMode } from "./utils/ambientPreviewQueue";
 import { upscaleErrorMessage } from "./utils/upscaleCompatibility";
@@ -7,6 +8,7 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
+  useSyncExternalStore,
   lazy,
   Suspense,
 } from "react";
@@ -17,23 +19,25 @@ import { useOsd, showOsd } from "./hooks/useOsd";
 import { useAutoUpscale } from "./hooks/useAutoUpscale";
 import { getCurrentWindow, PhysicalSize } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
-import { AppPlayIcon } from "./components/player/controls";
+import { EmptyScreen } from "./components/player/EmptyScreen";
 import "./index.css";
 import { Titlebar } from "./components/player/Titlebar";
 import { FileDragPreview } from "./components/player/FileDragPreview";
 import { PlayerControls } from "./components/player/PlayerControls";
+import { formatSpeedValue } from "./components/player/controls/SpeedPopover";
+import { cleanMediaName } from "./utils/mediaNameUtils";
+import { LiquidGlassSync } from "./theme/liquidGlass/LiquidGlassSync";
+import { getPlayerTheme, subscribePlayerTheme } from "./theme/liquidGlass/preferences";
 import { ContextMenu } from "./components/player/ContextMenu";
 import { PlaylistDrawer } from "./components/player/PlaylistDrawer";
 import { SeekIndicator } from "./components/player/SeekIndicator";
-import { formatSpeedValue } from "./components/player/controls";
-import { cleanMediaName } from "./utils/mediaNameUtils";
 import { VolumeIndicator } from "./components/player/VolumeIndicator";
 import { GlassHud } from "./components/player/GlassHud";
 import { triggerVolumeFeedback } from "./utils/volumeFeedback";
 import { UpdateInfo } from "./components/modals/UpdateModal";
 import { useAppUpdater } from "./hooks/useAppUpdater";
 import { getVisualizerConfig, saveVisualizerConfig, VisualizerMode } from "./components/player/AudioVisualizer";
-import { applyAccentColor } from "./utils/colorUtils";
+import { applyAccentColor } from "./theme/colors";
 import {
   getCustomHotkeys,
   isKeyboardEventMatch,
@@ -43,8 +47,7 @@ import { getFavoriteModel } from "./utils/favoriteModel";
 import { normalizeAmbientSettings } from "./utils/ambientSettingsUtils";
 import { addRecentFile } from "./utils/recentFilesUtils";
 import { getDict, getEffectiveLocale, saveLocale, type Locale } from "./i18n";
-import { useTranslation } from "./i18n/LanguageContext";
-import { getSavedUiSettingsStyle, type UiSettingsStyle } from "./utils/uiThemeUtils";
+import { getSavedUiSettingsStyle, type UiSettingsStyle } from "./theme/tokens";
 import {
   getSavedSeekStepSeconds,
   getSavedSkipOpeningSeconds,
@@ -61,10 +64,11 @@ import {
   useSettingsModulePreload,
 } from "./components/settings/lib/settingsModulePreload";
 import { SettingsPresence } from "./components/settings/SettingsPresence";
-// Settings stay out of the startup bundle; warm the selected view after the first frame.
-const MediaInfoModal = lazy(() =>
-  import("./components/modals/MediaInfoModal").then((m) => ({ default: m.MediaInfoModal }))
-);
+import {
+  MediaInfoModalView,
+  useMediaInfoModulePreload,
+} from "./components/modals/media-info-overlay/mediaInfoPreload";
+// Settings and MediaInfo stay out of the startup bundle; warm them in idle time after playback.
 const ChaptersModal = lazy(() =>
   import("./components/modals/ChaptersModal").then((m) => ({ default: m.ChaptersModal }))
 );
@@ -81,7 +85,6 @@ const SubtitlesSearchModal = lazy(() =>
 );
 
 function App() {
-  const { dict } = useTranslation();
   const {
     hasMedia,
     isIdle,
@@ -123,7 +126,7 @@ function App() {
       setShowUpdateToast(true);
     }
   }, [appUpdater.phase, showUpdateModal]);
-  const { osdText, isOsdClosing, isOsdError, triggerOsd, clearOsd, getOsdText } = useOsd();
+  const { osdText, osdIcon, isOsdClosing, isOsdError, triggerOsd, clearOsd, getOsdText } = useOsd();
   const [isCursorInUpperHalf, setIsCursorInUpperHalf] = useState(false);
   const [hideControlsInUpperHalf, setHideControlsInUpperHalf] = useState<boolean>(() => {
     try {
@@ -141,10 +144,9 @@ function App() {
   });
   
   const [settingsStyle, setSettingsStyle] = useState<UiSettingsStyle>(getSavedUiSettingsStyle);
-  useSettingsModulePreload(
-    hasMedia && Boolean(mediaInfo?.video_ready || mediaInfo?.video_track === false),
-    settingsStyle,
-  );
+  const isPlaybackReady = hasMedia && Boolean(mediaInfo?.video_ready || mediaInfo?.video_track === false);
+  useSettingsModulePreload(isPlaybackReady, settingsStyle);
+  useMediaInfoModulePreload(isPlaybackReady);
   const settingsWasOpenRef = useRef(false);
 
   const openSettings = useCallback(() => {
@@ -249,19 +251,17 @@ function App() {
   const clickTimerRef = useRef<number | null>(null);
   const hasMediaRef = useRef(hasMedia);
   const isSteppingRef = useRef(false);
-  const videoZoomRef = useRef<number>(0);
   const videoRotationRef = useRef<number>(0);
-  const videoPanXRef = useRef<number>(0);
-  const videoPanYRef = useRef<number>(0);
-  const rafIdRef = useRef<number | null>(null);
-
+  const { wheel: zoomVideo, reset: resetVideoZoom } = useVideoZoom(
+    hasMedia ? mediaInfo?.path : undefined,
+    (zoom) => {
+      const { osd } = getDict(getEffectiveLocale());
+      triggerOsd(zoom === 0 ? osd.zoomReset : osd.zoomLevel(Math.round(2 ** zoom * 100)), 1100, false, "zoom");
+    },
+  );
 
   useEffect(() => {
     hasMediaRef.current = hasMedia;
-    videoZoomRef.current = 0;
-    videoRotationRef.current = 0;
-    videoPanXRef.current = 0;
-    videoPanYRef.current = 0;
   }, [hasMedia]);
 
   useEffect(() => {
@@ -373,6 +373,7 @@ function App() {
 
   const shouldHideControlsInUpperHalf = hasMedia && hideControlsInUpperHalf && isCursorInUpperHalf;
   const isControlsVisible = hasMedia && !isIdle && !shouldHideControlsInUpperHalf;
+  const playerTheme = useSyncExternalStore(subscribePlayerTheme, getPlayerTheme);
   const subtitleUpdateQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   // Measure the rendered panel: capsule, modern, docked and CSS zoom have
   // different heights. Layout changes must update subtitles without mouse input.
@@ -488,6 +489,7 @@ function App() {
       try {
         await getCurrentWindow().show();
         isWindowRevealedRef.current = true;
+        window.dispatchEvent(new Event("l-mpv-window-revealed"));
       } catch { return; }
     }
     if (isWindowRevealedRef.current && hasMediaRef.current && !isStandaloneModeRef.current) {
@@ -514,13 +516,13 @@ function App() {
     try {
       const appWindow = getCurrentWindow();
       if (w> 0 && h> 0) {
-        const isFs = await appWindow.isFullscreen();
-        const isMax = await appWindow.isMaximized();
+        const [isFs, isMax, scaleFactor] = await Promise.all([
+          appWindow.isFullscreen(),
+          appWindow.isMaximized(),
+          appWindow.scaleFactor(),
+        ]);
         if (!isFs && !isMax) {
           const videoAspect = w / h;
-          
-          // Получаем масштаб экрана для перевода видео в логические пиксели
-          const scaleFactor = await appWindow.scaleFactor();
           let targetWidth = w / scaleFactor;
           let targetHeight = h / scaleFactor;
           
@@ -583,11 +585,6 @@ function App() {
       const isAspectChanged = Math.abs(prevAspect - curAspect)> 0.01;
 
       if (isNewFile || isAspectChanged) {
-        if (isNewFile) {
-          videoZoomRef.current = 0;
-          videoPanXRef.current = 0;
-          videoPanYRef.current = 0;
-        }
         lastSizedVideoRef.current = {
           path: mediaInfo.path,
           width: mediaInfo.width,
@@ -634,13 +631,38 @@ function App() {
     };
   }, [revealWindow]);
 
+  // ─── Показ окна после первого кадра при пустом запуске ────
+  // Бэкенд в этом случае окно не показывает (иначе вспышка прозрачного окна).
+  // Если ожидается медиафайл — ничего не делаем, окно покажет существующий flow.
+  useEffect(() => {
+    let cancelled = false;
+    invoke<boolean>("is_standalone_mode")
+      .then((isStandalone) => {
+        if (isStandalone) return false;
+        return invoke<boolean>("startup_pending");
+      })
+      .then((pending) => {
+        if (cancelled || pending !== false) return;
+        // Два кадра: коммит DOM уже есть, даём браузеру отрисовать его до show().
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            if (!cancelled) revealWindow();
+          }),
+        );
+      })
+      .catch(console.error);
+    return () => {
+      cancelled = true;
+    };
+  }, [revealWindow]);
+
   // ─── Отображение OSD кадра в левом верхнем углу ────
   const triggerFrameOsd = useCallback(async () => {
     try {
       await new Promise(r => setTimeout(r, 60));
       const frame = await invoke<number>("get_frame_number");
       const count = await invoke<number>("get_frame_count");
-      triggerOsd(`${frame} / ${count}`, 2000);
+      triggerOsd(`${frame} / ${count}`, 2000, false, "frame");
     } catch (e) {
       console.error(e);
     }
@@ -745,10 +767,8 @@ function App() {
       case "togglePause":
         curProlongControlsIfActive();
         if (curHasMedia) {
-          const wasPaused = Boolean(curMediaInfo?.paused);
           try {
             await curTogglePause();
-            triggerOsd(wasPaused ? dict.controls.play : dict.controls.pause, 900);
           } catch (e) {
             console.error(e);
           }
@@ -771,7 +791,6 @@ function App() {
       case "skipOpening": {
         curProlongControlsIfActive();
         const seconds = getSavedSkipOpeningSeconds();
-        triggerSeekIndicator("right", seconds);
         await curSeekBy(seconds);
         break;
       }
@@ -798,12 +817,9 @@ function App() {
           triggerVolumeFeedback(volume);
         }
         break;
-      case "fullscreen": {
-        const wasFullscreen = latestRef.current.isFullscreen;
-        await curToggleFullscreen();
-        triggerOsd(wasFullscreen ? dict.controls.exitFullscreen : dict.controls.fullscreen, 1200);
+      case "fullscreen":
+        curToggleFullscreen();
         break;
-      }
       case "frameBack":
         if (isSteppingRef.current) return;
         isSteppingRef.current = true;
@@ -830,7 +846,7 @@ function App() {
       case "copyFrame":
         try {
           await invoke("copy_frame_to_clipboard");
-          triggerOsd(dict.osd.frameCopied, 2000);
+          triggerOsd(dict.osd.frameCopied, 2000, false, "screenshot");
         } catch (err) {
           console.error(err);
         }
@@ -838,7 +854,7 @@ function App() {
       case "screenshot":
         try {
           await invoke("take_screenshot");
-          triggerOsd(dict.osd.frameSaved, 2000);
+          triggerOsd(dict.osd.frameSaved, 2000, false, "screenshot");
         } catch (err) {
           console.error(err);
         }
@@ -887,7 +903,7 @@ function App() {
         const cfg = getVisualizerConfig();
         const nextEnabled = !cfg.enabled;
         saveVisualizerConfig({ ...cfg, enabled: nextEnabled });
-        triggerOsd(dict.osd.visualizerStatus(nextEnabled), 1500);
+        triggerOsd(dict.osd.visualizerStatus(nextEnabled), 1500, false, "visualizer");
         break;
       }
       case "cycleVisualizerMode": {
@@ -896,36 +912,32 @@ function App() {
         const nextIdx = (modes.indexOf(cfg.mode) + 1) % modes.length;
         const nextMode = modes[nextIdx];
         saveVisualizerConfig({ ...cfg, enabled: true, mode: nextMode });
-        triggerOsd(dict.osd.visualizerMode(nextMode), 1500);
+        triggerOsd(dict.osd.visualizerMode(nextMode), 1500, false, "visualizer");
         break;
       }
       case "rotateVideo": {
-        const nextRot = (videoRotationRef.current + 90) % 360;
-        videoRotationRef.current = nextRot;
         try {
+          const nextRot = (videoRotationRef.current + 90) % 360;
+          videoRotationRef.current = nextRot;
           await invoke("set_rotation", { degrees: nextRot });
           window.dispatchEvent(new Event("l-mpv-preview-transform-changed"));
+          triggerOsd(dict.osd.rotation(nextRot), 1500, false, "rotate");
         } catch (e) {
           console.error(e);
         }
-        triggerOsd(dict.osd.rotation(nextRot), 1500);
         break;
       }
       case "toggleLanguage": {
-        const nextLocale: Locale = curLocale === "ru" ? "en" : curLocale === "en" ? "zh" : "ru";
+        const nextLocale: Locale = curLocale === "ru" ? "en" : "ru";
         saveLocale(nextLocale);
-        const langName = nextLocale === "ru" ? "Русский" : nextLocale === "zh" ? "中文" : "English";
+        const langName = nextLocale === "ru" ? "Русский" : "English";
         const nextDict = getDict(nextLocale);
         const osdMsg = nextDict.osd.languageSwitched(langName);
-        triggerOsd(osdMsg, 1500);
+        triggerOsd(osdMsg, 1500, false, "language");
         break;
       }
       case "resetZoom":
-        videoZoomRef.current = 0;
-        videoPanXRef.current = 0;
-        videoPanYRef.current = 0;
-        invoke("set_video_zoom_and_pan", { zoom: 0, panX: 0, panY: 0 }).catch(console.error);
-        triggerOsd(dict.osd.zoomReset, 1500);
+        resetVideoZoom();
         break;
       case "playlist":
         curSetIsPlaylistOpen(!curIsPlaylistOpen);
@@ -952,53 +964,37 @@ function App() {
         window.dispatchEvent(new CustomEvent("l-mpv-toggle-popover", { detail: { type: "sub" } }));
         break;
       case "playlistPrev":
-      case "playlistNext": {
-        const goNext = actionId === "playlistNext";
-        invoke(goNext ? "playlist_next" : "playlist_prev").catch(console.error);
-        // Имя нового файла приходит асинхронно — показываем его после переключения
-        window.setTimeout(() => {
-          const path = latestRef.current.mediaInfo?.path;
-          if (path) {
-            triggerOsd(dict.osd.nowPlaying(path.split(/[/\\]/).pop() || path), 1800);
-          }
-        }, 700);
+        invoke("playlist_prev").catch(console.error);
         break;
-      }
+      case "playlistNext":
+        invoke("playlist_next").catch(console.error);
+        break;
       case "speedUp":
         if (curMediaInfo) {
           const newSpeed = Math.min(4.0, (curMediaInfo.speed || 1.0) + 0.25);
           invoke("set_speed", { speed: newSpeed }).catch(console.error);
-          triggerOsd(dict.osd.speed(formatSpeedValue(newSpeed)), 1200);
+          triggerOsd(dict.osd.speed(formatSpeedValue(newSpeed)), 1400, false, "speed");
         }
         break;
       case "speedDown":
         if (curMediaInfo) {
           const newSpeed = Math.max(0.25, (curMediaInfo.speed || 1.0) - 0.25);
           invoke("set_speed", { speed: newSpeed }).catch(console.error);
-          triggerOsd(dict.osd.speed(formatSpeedValue(newSpeed)), 1200);
+          triggerOsd(dict.osd.speed(formatSpeedValue(newSpeed)), 1400, false, "speed");
         }
         break;
       case "speedReset":
-        if (curMediaInfo) {
-          invoke("set_speed", { speed: 1.0 }).catch(console.error);
-          triggerOsd(dict.osd.speed(formatSpeedValue(1.0)), 1200);
-        }
+        invoke("set_speed", { speed: 1.0 }).catch(console.error);
+        triggerOsd(dict.osd.speed(formatSpeedValue(1.0)), 1400, false, "speed");
         break;
       case "toggleShuffle":
-        try {
-          await invoke("toggle_shuffle");
-          triggerOsd(dict.controls.shuffle, 1200);
-        } catch (e) { console.error(e); }
+        invoke("toggle_shuffle").catch(console.error);
         break;
       case "alwaysOnTop":
         try {
           const appWindow = getCurrentWindow();
           const current = await appWindow.isAlwaysOnTop();
           await appWindow.setAlwaysOnTop(!current);
-          triggerOsd(
-            `${dict.controls.alwaysOnTop}: ${current ? dict.osd.disabled : dict.osd.enabled}`,
-            1200,
-          );
           window.dispatchEvent(new CustomEvent("l-mpv-action", { detail: actionId }));
         } catch (e) { console.error(e); }
         break;
@@ -1012,7 +1008,7 @@ function App() {
             off: dict.settings.cmenuUI.ambientOff,
             blur: dict.settings.cmenuUI.ambientBlur,
           };
-          triggerOsd(dict.osd.ambientMode(labels[res.mode] || res.mode), 2000);
+          triggerOsd(dict.osd.ambientMode(labels[res.mode] || res.mode), 2000, false, "ambient");
           window.dispatchEvent(new CustomEvent("l-mpv-ambient-changed", { detail: res }));
           window.dispatchEvent(new Event("l-mpv-settings-changed"));
         } catch (e) {
@@ -1045,8 +1041,8 @@ function App() {
             const modelIndex = status?.models?.findIndex((m) => m.slot === slot || m.filename === selectedModel);
             const modelNumber = modelIndex !== undefined && modelIndex !== -1 ? modelIndex + 1 : 1;
             const activeModel = status?.models?.find((m) => m.slot === slot || m.filename === selectedModel);
-            const rawName = activeModel?.display_name || (selectedModel ? selectedModel.replace(/\.onnx$/i, "") : (curLocale === "en" ? `Slot #${slot}` : curLocale === "zh" ? `槽位 #${slot}` : `Слот #${slot}`));
-            const modelName = isHideModelNames ? (curLocale === "en" ? `Model #${modelNumber}` : curLocale === "zh" ? `模型 #${modelNumber}` : `Модель #${modelNumber}`) : rawName;
+            const rawName = activeModel?.display_name || (selectedModel ? selectedModel.replace(/\.onnx$/i, "") : (curLocale === "en" ? `Slot #${slot}` : `Слот #${slot}`));
+            const modelName = isHideModelNames ? (curLocale === "en" ? `Model #${modelNumber}` : `Модель #${modelNumber}`) : rawName;
             
             let backendDesc = backend;
             if (backend === "TensorRT") {
@@ -1062,20 +1058,18 @@ function App() {
               const fpsText = mediaInfo.fps ? ` @ ${mediaInfo.fps.toFixed(2)} fps` : "";
               videoStats = curLocale === "en"
                 ? `\nVideo: ${mediaInfo.width}×${mediaInfo.height}${fpsText} ➔ 4K UHD`
-                : curLocale === "zh"
-                ? `\n视频：${mediaInfo.width}×${mediaInfo.height}${fpsText} ➔ 4K UHD`
                 : `\nВидео: ${mediaInfo.width}×${mediaInfo.height}${fpsText} ➔ 4K UHD`;
             }
 
             const message = dict.osd.upscaleStatsAi(slot, modelName, backendDesc, videoStats);
-            triggerOsd(message, 3500);
+            triggerOsd(message, 3500, false, "sparkles");
           } else {
             let gpuHint = "";
             if (status?.gpu_info?.name) {
               gpuHint = `\nGPU: ${status.gpu_info.name} (${status.gpu_info.recommended_backend})`;
             }
             const message = dict.osd.upscaleStatsOff(gpuHint);
-            triggerOsd(message, 3500);
+            triggerOsd(message, 3500, false, "sparkles");
           }
         } catch (e) {
           console.error("Ошибка отображения статистики апскейлинга:", e);
@@ -1087,7 +1081,7 @@ function App() {
           const backend = localStorage.getItem("l-mpv-upscale-backend") || "DirectML";
           await invoke("switch_upscale_network_hotkey", { slot: 0, backend });
           localStorage.setItem("l-mpv-upscale-mode", "off");
-          triggerOsd(dict.osd.upscaleOff, 2000);
+          triggerOsd(dict.osd.upscaleOff, 2000, false, "sparkles");
           window.dispatchEvent(new Event("l-mpv-settings-changed"));
         } catch (e) { console.error("Ошибка отключения апскейлинга:", e); triggerOsd(dict.osd.upscaleError(upscaleErrorMessage(e, dict)), 3000, true); }
         break;
@@ -1095,14 +1089,14 @@ function App() {
         try {
           const favorite = getFavoriteModel();
           if (!favorite) {
-            triggerOsd(dict.osd.upscaleNoFavorite, 2500);
+            triggerOsd(dict.osd.upscaleNoFavorite, 2500, false, "sparkles");
             break;
           }
           const models = await invoke<Array<{ slot: number; display_name: string; filename: string }>>("scan_onnx_models").catch(() => []);
           const targetModel = models.find((m) => m.filename === favorite);
 
           if (!targetModel) {
-            triggerOsd(dict.osd.upscaleFavoriteNotFound(favorite), 2500);
+            triggerOsd(dict.osd.upscaleFavoriteNotFound(favorite), 2500, false, "sparkles");
             break;
           }
 
@@ -1115,7 +1109,7 @@ function App() {
           if (isFavoriteActive) {
             await invoke("switch_upscale_network_hotkey", { slot: 0, backend });
             localStorage.setItem("l-mpv-upscale-mode", "off");
-            triggerOsd(dict.osd.upscaleOff, 2000);
+            triggerOsd(dict.osd.upscaleOff, 2000, false, "sparkles");
           } else {
             await invoke("switch_upscale_network_hotkey", { slot: targetModel.slot, backend });
             localStorage.setItem("l-mpv-upscale-mode", "ai");
@@ -1124,9 +1118,9 @@ function App() {
 
             const isHideModelNames = localStorage.getItem("l-mpv-hide-model-names") === "true";
             const modelTitle = isHideModelNames
-              ? (curLocale === "en" ? "Favorite model" : curLocale === "zh" ? "收藏模型" : "Избранная модель")
+              ? dict.osd.upscaleFavoriteLabel
               : targetModel.display_name;
-            triggerOsd(dict.osd.upscaleModel(modelTitle), 2000);
+            triggerOsd(dict.osd.upscaleModel(modelTitle), 2000, false, "sparkles");
           }
 
           window.dispatchEvent(new Event("l-mpv-settings-changed"));
@@ -1161,13 +1155,13 @@ function App() {
             localStorage.setItem("l-mpv-upscale-selected-model", targetModel.filename);
 
             const isHideModelNames = localStorage.getItem("l-mpv-hide-model-names") === "true";
-            const modelTitle = isHideModelNames ? (curLocale === "en" ? `Model #${index + 1}` : curLocale === "zh" ? `模型 #${index + 1}` : `Модель #${index + 1}`) : targetModel.display_name;
+            const modelTitle = isHideModelNames ? (curLocale === "en" ? `Model #${index + 1}` : `Модель #${index + 1}`) : targetModel.display_name;
 
-            triggerOsd(dict.osd.upscaleModel(modelTitle), 2000);
+            triggerOsd(dict.osd.upscaleModel(modelTitle), 2000, false, "sparkles");
 
             window.dispatchEvent(new Event("l-mpv-settings-changed"));
           } else {
-            triggerOsd(dict.osd.upscaleModelNotFound(index + 1), 2000);
+            triggerOsd(dict.osd.upscaleModelNotFound(index + 1), 2000, false, "sparkles");
           }
         } catch (e) {
           console.error("Ошибка переключения нейросети по хоткею:", e);
@@ -1181,7 +1175,6 @@ function App() {
   const handleVideoClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.button !== 0) return;
-      // Клик, завершивший перетаскивание окна, гасится в src/zh-cn/drag.ts
       closeContextMenu();
       if (latestRef.current.isPlaylistOpen) {
         latestRef.current.setIsPlaylistOpen(false);
@@ -1399,7 +1392,7 @@ function App() {
       try {
         await invoke("load_audio_file", { path: file });
         await latestRef.current.loadTracks();
-        showOsd(d.osd.audioLoaded(getFileNameFromPath(file)));
+        showOsd(d.osd.audioLoaded(getFileNameFromPath(file)), { icon: "audio" });
       } catch (err) {
         console.error("Ошибка подключения аудиодорожки (Хотлоад):", err);
         showOsd(d.osd.audioLoadErr, { isError: true });
@@ -1408,7 +1401,7 @@ function App() {
       try {
         await invoke("load_subtitle_file", { path: file });
         await latestRef.current.loadTracks();
-        showOsd(d.osd.subsLoaded(getFileNameFromPath(file)));
+        showOsd(d.osd.subsLoaded(getFileNameFromPath(file)), { icon: "subtitles" });
       } catch (err) {
         console.error("Ошибка подключения субтитров (Хотлоад):", err);
         showOsd(d.osd.subtitlesLoadErr, { isError: true });
@@ -1438,7 +1431,7 @@ function App() {
     <div
       className={`app-container ${
         isIdle && hasMedia ? "app-container--idle" : ""
-      } ${
+      } ${!hasMedia ? "app-container--empty" : ""} ${
         shouldHideControlsInUpperHalf ? "app-container--hide-controls" : ""
       } ${isPlaylistOpen ? "app-container--playlist-open" : ""}`}
       onDrop={handleDrop}
@@ -1450,6 +1443,7 @@ function App() {
       {/* Футуристичный стеклянный Glass HUD: парящие уведомления и центральный Flash-глиф Play/Pause */}
       <GlassHud
         osdText={osdText}
+        osdIcon={osdIcon}
         isOsdClosing={isOsdClosing}
         isOsdError={isOsdError}
       />
@@ -1468,50 +1462,7 @@ function App() {
               const relX = (e.clientX - rect.left - rect.width / 2) / rect.width;
               const relY = (e.clientY - rect.top - rect.height / 2) / rect.height;
 
-              // Уменьшенный шаг (0.04 вместо 0.1) как в IINA/mpv.net для плавной микро-регулировки
-              const step = e.deltaY < 0 ? 0.04 : -0.04;
-              const prevZoom = videoZoomRef.current;
-              let nextZoom = prevZoom + step;
-              
-              // Ограничиваем диапазон зума
-              nextZoom = Math.max(-1.5, Math.min(3.0, nextZoom));
-              
-              // Магнитный сброс в 0 при приближении к 100%
-              if (Math.abs(nextZoom) < 0.025) {
-                nextZoom = 0;
-              }
-              
-              const scalePrev = Math.pow(2, prevZoom);
-              const scaleNext = Math.pow(2, nextZoom);
-
-              if (nextZoom === 0) {
-                videoPanXRef.current = 0;
-                videoPanYRef.current = 0;
-              } else {
-                videoPanXRef.current -= relX * (1 / scalePrev - 1 / scaleNext);
-                videoPanYRef.current -= relY * (1 / scalePrev - 1 / scaleNext);
-              }
-              
-              videoZoomRef.current = nextZoom;
-
-              // Батчинг через requestAnimationFrame (до 60 кадров/сек), убирающий лаги первого зума
-              if (rafIdRef.current === null) {
-                rafIdRef.current = requestAnimationFrame(() => {
-                  rafIdRef.current = null;
-                  const targetZoom = videoZoomRef.current;
-                  const targetPanX = videoPanXRef.current;
-                  const targetPanY = videoPanYRef.current;
-                  invoke("set_video_zoom_and_pan", { 
-                    zoom: targetZoom, 
-                    panX: targetPanX, 
-                    panY: targetPanY 
-                  }).catch(console.error);
-
-                  const percentage = Math.round(Math.pow(2, targetZoom) * 100);
-                  const d = getDict(getEffectiveLocale());
-                  triggerOsd(targetZoom === 0 ? d.osd.zoomReset : d.osd.zoomLevel(percentage), 1100);
-                });
-              }
+              if (rect.width > 0 && rect.height > 0) zoomVideo(e.deltaY, relX, relY);
             } else {
               const currentVol = mediaInfo.volume;
               const delta = e.deltaY < 0 ? 5 : -5;
@@ -1522,21 +1473,15 @@ function App() {
           }
         }}
         >
-        {!hasMedia && (
-          <div className="video-area__placeholder">
-            <div className="video-area__placeholder-icon">
-              <AppPlayIcon size={80} />
-            </div>
-            <div className="video-area__placeholder-text">
-              L-MPV
-            </div>
-            <div className="video-area__placeholder-hint">
-              {dict.controls.placeholderHint}
-            </div>
-          </div>
-        )}
+        {!hasMedia && <EmptyScreen />}
       </div>
 
+      <LiquidGlassSync
+        enabled={hasMedia && playerTheme === "glass"}
+        visible={isControlsVisible || showMediaInfo}
+        videoReady={Boolean(mediaInfo?.video_ready)}
+        mediaPath={mediaInfo?.path ?? ""}
+      />
       {hasMedia && (
         <PlayerControls
           controlsVisible={isControlsVisible}
@@ -1614,7 +1559,7 @@ function App() {
 
         {showMediaInfo && (
           <Suspense key="media-info" fallback={null}>
-            <MediaInfoModal
+            <MediaInfoModalView
               onClose={() => setShowMediaInfo(false)}
             />
           </Suspense>

@@ -2,21 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { UpdateInfo } from "../components/modals/UpdateModal";
-import { getEffectiveLocale } from "../i18n";
-
-/**
- * 更新失败时的兜底提示（仅当后端未返回可读错误时使用）。
- */
-function updateErrorMessage(kind: "download" | "restart"): string {
-  const locale = getEffectiveLocale();
-  if (locale === "zh") {
-    return kind === "download" ? "更新下载失败" : "重启播放器失败";
-  }
-  if (locale === "en") {
-    return kind === "download" ? "Failed to download update" : "Failed to restart player";
-  }
-  return kind === "download" ? "Ошибка загрузки обновления" : "Не удалось перезапустить плеер";
-}
+import { getDict, getEffectiveLocale } from "../i18n";
 
 export type AppUpdatePhase =
   | "idle"
@@ -113,12 +99,19 @@ export function useAppUpdater(): AppUpdaterController {
       setProgress(100);
       setPhase("ready");
     } catch (err: unknown) {
-      const msg =
+      const locale = getEffectiveLocale();
+      const d = getDict(locale);
+      const rawMsg =
         typeof err === "string"
-          ? (/[\u0400-\u04FF]/.test(err) ? updateErrorMessage("download") : err)
+          ? err
           : err instanceof Error
-          ? (/[\u0400-\u04FF]/.test(err.message) ? updateErrorMessage("download") : err.message)
-          : updateErrorMessage("download");
+          ? err.message
+          : "";
+      const hasCyrillic = /[\u0400-\u04FF]/.test(rawMsg);
+      const msg =
+        rawMsg && (locale === "ru" || !hasCyrillic)
+          ? rawMsg
+          : d.updateModal.downloadErrorFallback;
       console.error("Ошибка фонового обновления L-MPV:", err);
       setErrorMessage(msg);
       setPhase("error");
@@ -132,12 +125,19 @@ export function useAppUpdater(): AppUpdaterController {
     try {
       await invoke("restart_and_apply_update");
     } catch (err: unknown) {
-      const msg =
+      const locale = getEffectiveLocale();
+      const d = getDict(locale);
+      const rawMsg =
         typeof err === "string"
-          ? (/[\u0400-\u04FF]/.test(err) ? updateErrorMessage("restart") : err)
+          ? err
           : err instanceof Error
-          ? (/[\u0400-\u04FF]/.test(err.message) ? updateErrorMessage("restart") : err.message)
-          : updateErrorMessage("restart");
+          ? err.message
+          : "";
+      const hasCyrillic = /[\u0400-\u04FF]/.test(rawMsg);
+      const msg =
+        rawMsg && (locale === "ru" || !hasCyrillic)
+          ? rawMsg
+          : d.updateModal.restartErrorFallback;
       console.error("Ошибка перезапуска для обновления L-MPV:", err);
       setErrorMessage(msg);
       setPhase("error");

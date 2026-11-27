@@ -331,26 +331,6 @@ pub fn frame_step(
     invalidate_ambient_result(&state, result)
 }
 
-/// 通用 mpv 命令透传：用于从前端触发 Lua 脚本绑定（如 stats 面板）。
-/// Универсальный мост mpv-команд: триггерит Lua script-binding из фронтенда.
-#[tauri::command]
-pub fn mpv_command(
-    state: State<'_, PlayerState>,
-    command: String,
-) -> Result<(), String> {
-    state.mpv.command(&command)
-}
-
-/// 读取 mpv 字符串属性（如 media-title）。
-/// Чтение строкового свойства mpv (например, media-title).
-#[tauri::command]
-pub fn mpv_get_property_string(
-    state: State<'_, PlayerState>,
-    name: String,
-) -> Result<String, String> {
-    state.mpv.get_property_string(&name)
-}
-
 /// Шаг на один кадр назад.
 #[tauri::command]
 pub fn frame_back_step(
@@ -465,29 +445,23 @@ pub fn set_rotation(
 
 /// Установка зума и панорамирования видео.
 #[tauri::command]
-pub fn set_video_zoom_and_pan(
+pub async fn set_video_zoom_and_pan(
     state: State<'_, PlayerState>,
     zoom: f64,
     pan_x: f64,
     pan_y: f64,
 ) -> Result<(), String> {
-    state.mpv.set_property_double("video-zoom", zoom)?;
-    if zoom.abs() < 0.001 {
-        let _ = state
-            .mpv
-            .set_property_double("video-pan-x", 0.0);
-        let _ = state
-            .mpv
-            .set_property_double("video-pan-y", 0.0);
-    } else {
-        let _ = state
-            .mpv
-            .set_property_double("video-pan-x", pan_x);
-        let _ = state
-            .mpv
-            .set_property_double("video-pan-y", pan_y);
+    if ![zoom, pan_x, pan_y].iter().all(|value| value.is_finite()) {
+        return Err("Invalid video transform".into());
     }
-    Ok(())
+    let (pan_x, pan_y) = if zoom.abs() < 0.001 {
+        (0.0, 0.0)
+    } else {
+        (pan_x, pan_y)
+    };
+    state.mpv.command(&format!(
+        "no-osd set video-zoom {zoom}; no-osd set video-pan-x {pan_x}; no-osd set video-pan-y {pan_y}"
+    ))
 }
 
 /// Получение текущего зума видео.
@@ -961,6 +935,7 @@ pub fn get_playback_state(
     live_bitrate: State<'_, crate::commands::LiveVideoBitrateService>,
 ) -> Result<PlaybackState, String> {
     let mut snapshot = state.mpv.get_playback_state_snapshot()?;
+    state.ebu128.observe(&state.mpv, &snapshot.path, &snapshot.current_aid);
     let current_vid = snapshot.current_vid.trim().parse::<i64>().ok();
     if let Some(exact_bps) = live_bitrate.peek_cached_bitrate(
         &snapshot.path,
@@ -989,6 +964,24 @@ pub fn get_video_dimensions(
         crate::window_aspect_ratio::reset_aspect_ratio();
     }
     Ok((status.width, status.height))
+}
+
+/// 通用 mpv 命令透传：用于从前端触发 Lua 脚本绑定（如 stats 面板）。
+#[tauri::command]
+pub fn mpv_command(
+    state: State<'_, PlayerState>,
+    command: String,
+) -> Result<(), String> {
+    state.mpv.command(&command)
+}
+
+/// 读取 mpv 字符串属性（如 media-title）。
+#[tauri::command]
+pub fn mpv_get_property_string(
+    state: State<'_, PlayerState>,
+    name: String,
+) -> Result<String, String> {
+    state.mpv.get_property_string(&name)
 }
 
 #[cfg(test)]

@@ -16,7 +16,8 @@ import { useTranslation } from "../../i18n/LanguageContext";
 import {
   ControlBarStyle,
   getSavedControlBarStyle,
-} from "../../utils/controlBarStyleUtils";
+} from "../../theme/controlBarStyle";
+import { notifyLiquidGlassAnimation } from "../../theme/liquidGlass/LiquidGlassSync";
 import type { AppUpdaterController } from "../../hooks/useAppUpdater";
 import {
   AppLogoIcon,
@@ -69,12 +70,20 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
   useEffect(() => {
     const syncStyle = () => setControlBarStyle(getSavedControlBarStyle());
     window.addEventListener("l-mpv-settings-changed", syncStyle);
+    window.addEventListener("l-mpv-control-bar-style-changed", syncStyle);
+    window.addEventListener("l-mpv-player-theme-changed", syncStyle);
     window.addEventListener("storage", syncStyle);
     return () => {
       window.removeEventListener("l-mpv-settings-changed", syncStyle);
+      window.removeEventListener("l-mpv-control-bar-style-changed", syncStyle);
+      window.removeEventListener("l-mpv-player-theme-changed", syncStyle);
       window.removeEventListener("storage", syncStyle);
     };
   }, []);
+
+  useEffect(() => {
+    notifyLiquidGlassAnimation(360);
+  }, [isExpanded, controlBarStyle]);
 
   const currentVersion = normalizeVersion(updateInfo.current_version);
   const targetVersion = normalizeVersion(selectedRelease.latest_version);
@@ -219,17 +228,18 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     setIsPickerOpen(false);
   };
 
+  const isVersionInfo = !isUpgrade && !isDowngrade;
   const titleText = isUpgrade
     ? dict.updateModal.titleUpgrade
     : isDowngrade
     ? dict.updateModal.titleDowngrade
-    : dict.updateModal.titleInfo;
+    : dict.updateModal.titleInfo(currentVersion);
 
   const subtitleText = isUpgrade
     ? dict.updateModal.subtitleUpgrade(targetVersion)
     : isDowngrade
     ? dict.updateModal.subtitleDowngrade(currentVersion, targetVersion)
-    : dict.updateModal.subtitleInfo(currentVersion);
+    : null;
 
   const changelogText = isUpgrade
     ? dict.updateModal.changelogUpgrade
@@ -277,14 +287,13 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
   return (
     <MotionSurface
       kind="backdrop"
-      className="modal-overlay"
+      className="modal-overlay update-modal-overlay"
       onClick={handleClose}
       style={{
         zIndex: "var(--z-modal)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "rgba(0, 0, 0, 0.65)",
       }}
     >
       {!isCapsule ? (
@@ -298,74 +307,59 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           style={{
             width: isExpanded ? "820px" : "480px",
             maxWidth: "min(94vw, calc(100vw / var(--ui-scale, 1) - 24px))",
-            height: isExpanded ? "78vh" : "420px",
-            maxHeight: "min(92vh, calc(100dvh / var(--ui-scale, 1) - 24px))",
+            height: isExpanded ? "100%" : "min(440px, 100%)",
+            maxHeight: "100%",
             display: "flex",
             flexDirection: "column",
-            borderRadius: "var(--radius-surface)",
-            background: "linear-gradient(180deg, rgba(26, 28, 35, 0.96) 0%, rgba(18, 19, 24, 0.98) 100%)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            boxShadow: isExpanded
-              ? "0 25px 60px rgba(0, 0, 0, 0.75)"
-              : "0 20px 50px rgba(0, 0, 0, 0.6)",
             overflow: "hidden",
             color: "var(--text, #fff)",
             transition:
-              "width 0.3s cubic-bezier(0.16, 1, 0.3, 1), height 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-radius var(--t-spring) var(--ease-spring-smooth)",
+              "width 0.3s cubic-bezier(0.16, 1, 0.3, 1), height 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-radius var(--t-spring) var(--ease-spring-smooth)",
           }}
         >
           <div
+            className="modal__header update-modal-heading"
             onDoubleClick={() => setIsExpanded((prev) => !prev)}
             style={{
-              padding: "10px 22px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 14,
-              borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-              background: "rgba(0, 0, 0, 0.2)",
+              gap: 12,
               cursor: "default",
               userSelect: "none",
-              flexShrink: 0,
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
               <div
                 style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "var(--radius-control)",
-                  background: "rgba(var(--accent-rgb, 59, 130, 246), 0.12)",
-                  border: "1px solid var(--border-pill, rgba(var(--accent-rgb, 59, 130, 246), 0.22))",
+                  width: 28,
+                  height: 28,
+                  boxSizing: "border-box",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  background: "transparent",
+                  border: "none",
                   boxShadow: "none",
                   flexShrink: 0,
-                  transition: "border-radius var(--t-spring) var(--ease-spring-smooth)",
                 }}
               >
-                <AppLogoIcon size={18} color="var(--accent-text, var(--accent))" />
+                <AppLogoIcon size={20} color="var(--accent-text, var(--accent))" />
               </div>
               <div style={{ minWidth: 0 }}>
                 <h3
                   id="update-modal-title"
-                  style={{
-                    margin: "var(--space-0)",
-                    fontSize: "var(--fs-lg)",
-                    fontWeight: 700,
-                    letterSpacing: "-0.01em",
-                  }}
+                  className="modal__title"
+                  style={{ margin: "var(--space-0)" }}
                 >
                   {titleText}
                 </h3>
-                <p style={{ margin: "1px 0 0", fontSize: "var(--fs-xs)", color: "var(--text-muted, #9ca3af)" }}>
-                  {subtitleText}
-                </p>
+                {subtitleText && (
+                  <p style={{ margin: "2px 0 0", fontSize: "var(--fs-xs)", color: "var(--text-muted, #9ca3af)" }}>
+                    {subtitleText}
+                  </p>
+                )}
               </div>
             </div>
 
-            <div className="row-center row-gap-3">
+            <div className="row-center update-modal-window-actions">
               <button
                 onClick={() => setIsExpanded((prev) => !prev)}
                 className="modal__close"
@@ -378,25 +372,25 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 className="modal__close"
                 aria-label={dict.updateModal.ariaClose}
               >
-                <X size={18} />
+                <X size={18} strokeWidth={2.4} />
               </button>
             </div>
           </div>
 
           <div
+            className="update-modal-content"
             style={{
-              padding: isExpanded ? "18px 26px 14px" : "16px 24px 14px",
+              paddingBlock: "16px 14px",
               flex: 1,
               overflow: "hidden",
               minHeight: 0,
               display: "flex",
               flexDirection: "column",
-              transition: "padding 0.3s ease",
             }}
           >
             <div
               style={{
-                marginBottom: errorMessage || showProgressArea ? 14 : 0,
+                marginBottom: errorMessage || showProgressArea ? 10 : 0,
                 display: "flex",
                 flexDirection: "column",
                 flex: 1,
@@ -431,8 +425,8 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "var(--space-2)",
-                    background: "var(--surface-level-3)",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    background: "transparent",
+                    border: "1px solid transparent",
                     borderRadius: "var(--radius-control, 8px)",
                     padding: "4px 10px",
                     fontSize: "var(--fs-xs)",
@@ -448,16 +442,9 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 </button>
               </div>
               <div
-                className="custom-scrollbar"
+                className="custom-scrollbar update-modal-notes-wrap"
                 style={{
-                  flex: 1,
-                  minHeight: 0,
-                  overflowY: "auto",
-                  background: "rgba(0, 0, 0, 0.35)",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "var(--radius-md, 12px)",
                   padding: isExpanded ? "14px 18px" : "12px 14px",
-                  transition: "padding 0.3s ease, border-radius var(--t-spring) var(--ease-spring-smooth)",
                 }}
               >
                 <MarkdownRenderer content={selectedRelease.release_notes} />
@@ -500,13 +487,12 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           <div
             className="update-modal-footer"
             style={{
-              padding: "10px 22px",
-              borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+              paddingBlock: "10px",
+              borderTop: "1px solid var(--border)",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               gap: 14,
-              background: "rgba(0, 0, 0, 0.2)",
               flexShrink: 0,
               position: "relative",
             }}
@@ -526,7 +512,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           aria-labelledby="update-modal-title"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="update-capsule-header">
+          <div className={`update-capsule-header${isVersionInfo ? " update-capsule-header--compact" : ""}`}>
             <div className="update-card update-card--logo">
               <AppLogoIcon size={28} color="var(--accent-text, var(--accent))" />
             </div>
@@ -539,7 +525,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 <h3 id="update-modal-title" className="update-card__title">
                   {titleText}
                 </h3>
-                <p className="update-card__subtitle">{subtitleText}</p>
+                {subtitleText && <p className="update-card__subtitle">{subtitleText}</p>}
               </div>
             </div>
 
@@ -558,7 +544,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 className="update-card__action-btn update-card__action-btn--close"
                 aria-label={dict.updateModal.ariaClose}
               >
-                <X size={18} />
+                <X size={18} strokeWidth={2.4} />
               </button>
             </div>
           </div>
@@ -601,7 +587,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             )}
 
             {showProgressArea && (
-              <div style={{ marginTop: "12px" }}>
+              <div style={{ marginTop: "10px", flexShrink: 0 }}>
                 <DownloadProgressBar
                   progress={progress}
                   downloadedBytes={downloadedBytes}

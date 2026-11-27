@@ -4,7 +4,6 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save } from "@tauri-apps/plugin-dialog";
 import { getDict, getEffectiveLocale } from "../i18n";
-import { showOsd } from "../hooks/useOsd";
 import { playbackPollDelay } from "../utils/playbackPolling";
 
 export interface PlaylistItem {
@@ -85,6 +84,15 @@ export interface TrackInfo {
   ff_index?: number;
 }
 
+export interface TrackDownloadState {
+  /** Ключ скачиваемой дорожки (`audio-<id>` или `sub-<id>`). */
+  trackKey: string;
+  /** Прогресс извлечения от 0 до 100. */
+  progress: number;
+  /** Текущий статус операции. */
+  status: "running" | "completed";
+}
+
 export interface PlayerProgress {
   position: number;
   duration: number;
@@ -140,12 +148,16 @@ interface PlayerStateContextType {
   toggleFullscreen: () => Promise<void>;
   /** Ключ дорожки, которая сейчас извлекается (напр. 'audio-1' или 'sub-2'). */
   downloadingTrackKey: string | null;
+  /** Детальное состояние выкачивания дорожки (ключ, проценты, статус завершения). */
+  trackDownloadState: TrackDownloadState | null;
   /** Скачивается ли в данный момент аудиодорожка. */
   isAudioDownloading: boolean;
   /** Скачиваются ли в данный момент субтитры. */
   isSubDownloading: boolean;
   /** Функция скачивания (извлечения) выбранной дорожки в файл. */
   handleDownloadTrack: (track: TrackInfo) => Promise<void>;
+  /** Отмена активного скачивания (извлечения) дорожки. */
+  handleCancelDownloadTrack: (trackKey: string) => Promise<void>;
   /** Список элементов плейлиста. */
   playlist: PlaylistItem[];
   /** Обновление элементов плейлиста из бэкенда. */
@@ -183,9 +195,11 @@ const PlayerStateContext = createContext<PlayerStateContextType>({
   isFullscreen: false,
   toggleFullscreen: async () => {},
   downloadingTrackKey: null,
+  trackDownloadState: null,
   isAudioDownloading: false,
   isSubDownloading: false,
   handleDownloadTrack: async () => {},
+  handleCancelDownloadTrack: async () => {},
   playlist: [],
   refreshPlaylist: async () => {},
   setPlaylist: () => {},
@@ -386,9 +400,9 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
 
     idleTimer.current = window.setTimeout(() => {
       const currentUIOpen = !!document.querySelector(
-        ".track-popover, .controls-overflow, .modal, .settings-side-panel, .context-menu, .playlist-drawer, .media-info-overlay, .chapters-modal-overlay, .subtitles-modal-overlay"
+        "[data-liquid-glass-menu], .track-popover, .controls-overflow, .modal, .settings-side-panel, .context-menu, .playlist-drawer, .chapters-modal-overlay, .subtitles-modal-overlay"
       );
-      const isDragging = !!document.querySelector(".timeline--dragging");
+      const isDragging = !!document.querySelector("[data-liquid-glass-drag], .timeline--dragging");
       if (!currentUIOpen && !isDragging) {
         isIdleRef.current = true;
         setIsIdle(true);
@@ -405,9 +419,9 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
 
       idleTimer.current = window.setTimeout(() => {
         const currentUIOpen = !!document.querySelector(
-          ".track-popover, .controls-overflow, .modal, .settings-side-panel, .context-menu, .playlist-drawer, .media-info-overlay, .chapters-modal-overlay, .subtitles-modal-overlay"
+          "[data-liquid-glass-menu], .track-popover, .controls-overflow, .modal, .settings-side-panel, .context-menu, .playlist-drawer, .chapters-modal-overlay, .subtitles-modal-overlay"
         );
-        const isDragging = !!document.querySelector(".timeline--dragging");
+        const isDragging = !!document.querySelector("[data-liquid-glass-drag], .timeline--dragging");
         if (!currentUIOpen && !isDragging) {
           isIdleRef.current = true;
           setIsIdle(true);
@@ -429,7 +443,7 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
 
       // Проверяем, открыты ли какие-либо модальные окна или всплывающие меню
       const isAnyUIOpen = !!document.querySelector(
-        ".track-popover, .controls-overflow, .modal, .settings-side-panel, .context-menu, .playlist-drawer, .media-info-overlay, .chapters-modal-overlay, .subtitles-modal-overlay"
+        "[data-liquid-glass-menu], .track-popover, .controls-overflow, .modal, .settings-side-panel, .context-menu, .playlist-drawer, .chapters-modal-overlay, .subtitles-modal-overlay"
       );
 
       // Продолжаем проверять после закрытия оверлея, даже без движения мыши.
@@ -1014,8 +1028,6 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
     });
     try {
       localStorage.setItem("l-mpv-volume", clamped.toString());
-      const d = getDict(getEffectiveLocale());
-      showOsd(clamped === 0 ? d.osd.muted : d.osd.volume(clamped));
     } catch (e) {
       console.error(e);
     }
@@ -1031,6 +1043,15 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
 
   // ─── Интеграция с Taskbar Windows с фильтрацией шага ───
   const lastTaskbarRef = useRef<{ discrete: number; paused: boolean }>({ discrete: -1, paused: false });
+  const [taskbarRevealTick, setTaskbarRevealTick] = useState(0);
+  useEffect(() => {
+    const handleRevealed = () => {
+      lastTaskbarRef.current = { discrete: -1, paused: false };
+      setTaskbarRevealTick((t) => t + 1);
+    };
+    window.addEventListener("l-mpv-window-revealed", handleRevealed);
+    return () => window.removeEventListener("l-mpv-window-revealed", handleRevealed);
+  }, []);
   useEffect(() => {
     const curPos = progress.position;
     const curDur = progress.duration;
@@ -1042,13 +1063,11 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
         lastTaskbarRef.current = { discrete, paused: isPaused };
         invoke("update_taskbar_progress", { progress: prog, paused: isPaused }).catch(() => {});
       }
-    } else {
-      if (lastTaskbarRef.current.discrete !== 0 || !lastTaskbarRef.current.paused) {
-        lastTaskbarRef.current = { discrete: 0, paused: true };
-        invoke("update_taskbar_progress", { progress: 0.0, paused: true }).catch(() => {});
-      }
+    } else if (lastTaskbarRef.current.discrete > 0) {
+      lastTaskbarRef.current = { discrete: 0, paused: true };
+      invoke("update_taskbar_progress", { progress: 0.0, paused: true }).catch(() => {});
     }
-  }, [progress.position, progress.duration, mediaInfo?.paused]);
+  }, [progress.position, progress.duration, mediaInfo?.paused, taskbarRevealTick]);
 
   // ─── Автосохранение истории просмотров с передачей duration ───
   useEffect(() => {
@@ -1120,11 +1139,11 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       const t = tracksRef.current.find(x => x.type === "audio" && x.id === trackId);
       const curLoc = getEffectiveLocale();
       if (t) {
-        const prefix = curLoc === "en" ? "Audio: " : curLoc === "zh" ? "音轨: " : "Аудио: ";
-        const fallback = curLoc === "en" ? `Track ${t.id}` : curLoc === "zh" ? `轨道 ${t.id}` : `Дорожка ${t.id}`;
+        const prefix = curLoc === "en" ? "Audio: " : "Аудио: ";
+        const fallback = curLoc === "en" ? `Track ${t.id}` : `Дорожка ${t.id}`;
         invoke("show_osd", { text: `${prefix}${t.title || t.lang || fallback}` }).catch(() => {});
       } else if (trackId <= 0) {
-        const offText = curLoc === "en" ? "Audio: Off" : curLoc === "zh" ? "音轨: 关" : "Аудио: Выкл";
+        const offText = curLoc === "en" ? "Audio: Off" : "Аудио: Выкл";
         invoke("show_osd", { text: offText }).catch(() => {});
       }
       await loadTracks();
@@ -1144,7 +1163,7 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       });
       await invoke("disable_subtitles");
       const curLoc = getEffectiveLocale();
-      const offText = curLoc === "en" ? "Subtitles: Off" : curLoc === "zh" ? "字幕: 关" : "Субтитры: Выкл";
+      const offText = curLoc === "en" ? "Subtitles: Off" : "Субтитры: Выкл";
       invoke("show_osd", { text: offText }).catch(() => {});
       await loadTracks();
     } catch (e) {
@@ -1167,8 +1186,8 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       const t = tracksRef.current.find(x => x.type === "sub" && x.id === trackId);
       if (t) {
         const curLoc = getEffectiveLocale();
-        const prefix = curLoc === "en" ? "Subtitles: " : curLoc === "zh" ? "字幕: " : "Субтитры: ";
-        const fallback = curLoc === "en" ? `Track ${t.id}` : curLoc === "zh" ? `轨道 ${t.id}` : `Дорожка ${t.id}`;
+        const prefix = curLoc === "en" ? "Subtitles: " : "Субтитры: ";
+        const fallback = curLoc === "en" ? `Track ${t.id}` : `Дорожка ${t.id}`;
         invoke("show_osd", { text: `${prefix}${t.title || t.lang || fallback}` }).catch(() => {});
       }
       await loadTracks();
@@ -1182,10 +1201,7 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
     if (audioTracks.length === 0) return;
     const currentIdx = audioTracks.findIndex((t) => t.selected);
     const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % audioTracks.length;
-    const next = audioTracks[nextIdx];
-    await selectAudioTrack(next.id);
-    const d = getDict(getEffectiveLocale());
-    showOsd(d.osd.audioTrack(next.title || next.lang || `#${next.id}`), { durationMs: 1400 });
+    await selectAudioTrack(audioTracks[nextIdx].id);
   }, [tracks, selectAudioTrack]);
 
   const cycleSubTrack = useCallback(async () => {
@@ -1193,18 +1209,11 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
     if (subTracks.length === 0) return;
     const currentIdx = subTracks.findIndex((t) => t.selected);
     const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % (subTracks.length + 1); // +1 для состояния "отключено"
-    const d = getDict(getEffectiveLocale());
-
+    
     if (nextIdx === subTracks.length) {
       await disableSubtitles();
-      showOsd(d.osd.subTrack(d.controls.subOff), { durationMs: 1400 });
     } else {
-      const next = subTracks[nextIdx];
-      await selectSubTrack(next.id);
-      showOsd(
-        d.osd.subTrack(next.external_filename || next.title || next.lang || `#${next.id}`),
-        { durationMs: 1400 },
-      );
+      await selectSubTrack(subTracks[nextIdx].id);
     }
   }, [tracks, selectSubTrack, disableSubtitles]);
 
@@ -1223,6 +1232,7 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
         const fs = await appWindow.isFullscreen();
         if (isMounted && version === checkVersion) {
           setIsFullscreen(fs);
+          window.dispatchEvent(new Event("resize"));
         }
       } catch (e) {
         console.error("Ошибка при проверке полноэкранного режима окна:", e);
@@ -1259,6 +1269,7 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       // стилями WS_MAXIMIZE, предотвращая сжатие и смещение плеера в угол (0, 0)
       const newFs = await invoke<boolean>("toggle_fullscreen");
       setIsFullscreen(newFs);
+      window.dispatchEvent(new Event("resize"));
     } catch (e) {
       console.error("Ошибка при переключении полноэкранного режима через бэкенд:", e);
       // Запасное переключение через стандартный API окна Tauri
@@ -1274,7 +1285,16 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ─── Скачивание и извлечение аудиодорожек и субтитров ────────
-  const [downloadingTrackKey, setDownloadingTrackKey] = useState<string | null>(null);
+  const [trackDownloadState, setTrackDownloadState] =
+    useState<TrackDownloadState | null>(null);
+  const downloadClearTimerRef = useRef<number | null>(null);
+  const activeDownloadCancelledRef = useRef<string | null>(null);
+
+  const downloadingTrackKey =
+    trackDownloadState?.status === "running"
+      ? trackDownloadState.trackKey
+      : null;
+
   const isAudioDownloading = useMemo(
     () => downloadingTrackKey?.startsWith("audio-") ?? false,
     [downloadingTrackKey]
@@ -1283,6 +1303,85 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
     () => downloadingTrackKey?.startsWith("sub-") ?? false,
     [downloadingTrackKey]
   );
+
+  // Подписка на поток событий прогресса извлечения дорожек из FFmpeg
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    listen<{ track_key: string; progress: number; status: string }>(
+      "track-extract-progress",
+      (event) => {
+        if (disposed) return;
+        const { track_key: key, progress: rawProgress, status } = event.payload;
+        if (!key) return;
+
+        if (status === "running") {
+          if (downloadClearTimerRef.current !== null) {
+            window.clearTimeout(downloadClearTimerRef.current);
+            downloadClearTimerRef.current = null;
+          }
+          setTrackDownloadState((prev) => {
+            const prevProgress = prev?.trackKey === key ? prev.progress : 0;
+            return {
+              trackKey: key,
+              progress: Math.max(prevProgress, rawProgress),
+              status: "running",
+            };
+          });
+        } else if (status === "completed") {
+          if (downloadClearTimerRef.current !== null) {
+            window.clearTimeout(downloadClearTimerRef.current);
+          }
+          setTrackDownloadState({
+            trackKey: key,
+            progress: 100,
+            status: "completed",
+          });
+          downloadClearTimerRef.current = window.setTimeout(() => {
+            setTrackDownloadState((prev) =>
+              prev?.trackKey === key && prev.status === "completed"
+                ? null
+                : prev
+            );
+            downloadClearTimerRef.current = null;
+          }, 1400);
+        } else if (status === "cancelled" || status === "error") {
+          setTrackDownloadState((prev) =>
+            prev?.trackKey === key ? null : prev
+          );
+        }
+      }
+    )
+      .then((fn) => {
+        if (disposed) fn();
+        else unlisten = fn;
+      })
+      .catch(() => {});
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+      if (downloadClearTimerRef.current !== null) {
+        window.clearTimeout(downloadClearTimerRef.current);
+        downloadClearTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleCancelDownloadTrack = useCallback(async (trackKey: string) => {
+    activeDownloadCancelledRef.current = trackKey;
+    if (downloadClearTimerRef.current !== null) {
+      window.clearTimeout(downloadClearTimerRef.current);
+      downloadClearTimerRef.current = null;
+    }
+    setTrackDownloadState((prev) => (prev?.trackKey === trackKey ? null : prev));
+    try {
+      await invoke("cancel_track_extract", { trackKey });
+    } catch (err) {
+      console.error("Ошибка отмены извлечения дорожки:", err);
+    }
+  }, []);
 
   const getExtensionForTrack = useCallback((track: TrackInfo): string => {
     const c = (track.codec || "").toLowerCase();
@@ -1322,7 +1421,11 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       currentTracks.find((t) => t.type === track.type && t.id === track.id) || track;
 
     const trackKey = `${resolvedTrack.type}-${resolvedTrack.id}`;
-    setDownloadingTrackKey(trackKey);
+    if (downloadClearTimerRef.current !== null) {
+      window.clearTimeout(downloadClearTimerRef.current);
+      downloadClearTimerRef.current = null;
+    }
+    activeDownloadCancelledRef.current = null;
 
     try {
       const ext = getExtensionForTrack(resolvedTrack);
@@ -1335,8 +1438,6 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       if (!cleanTrackName) {
         const typeLabel = curLocale === "en"
           ? (resolvedTrack.type === "audio" ? "Audio" : "Subtitles")
-          : curLocale === "zh"
-          ? (resolvedTrack.type === "audio" ? "音轨" : "字幕")
           : (resolvedTrack.type === "audio" ? "Аудио" : "Субтитры");
         cleanTrackName = resolvedTrack.lang
           ? `${typeLabel}_${resolvedTrack.lang.toUpperCase()}`
@@ -1368,13 +1469,9 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       } else {
         const dialogTitle = curLocale === "en"
           ? `Save ${resolvedTrack.type === "audio" ? "audio track" : "subtitles"}`
-          : curLocale === "zh"
-          ? `保存${resolvedTrack.type === "audio" ? "音轨" : "字幕"}`
           : `Сохранить ${resolvedTrack.type === "audio" ? "аудиодорожку" : "субтитры"}`;
         const filterName = curLocale === "en"
           ? (resolvedTrack.type === "audio" ? "Audio file" : "Subtitles")
-          : curLocale === "zh"
-          ? (resolvedTrack.type === "audio" ? "音频文件" : "字幕")
           : (resolvedTrack.type === "audio" ? "Аудиофайл" : "Субтитры");
 
         finalTargetPath = await save({
@@ -1391,9 +1488,11 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
 
       if (!finalTargetPath) {
         // Пользователь отменил диалог проводника
-        setDownloadingTrackKey(null);
+        setTrackDownloadState(null);
         return;
       }
+
+      setTrackDownloadState({ trackKey, progress: 0, status: "running" });
 
       const typeTracks = currentTracks.filter(
         (t) => t.type === resolvedTrack.type && !t.external
@@ -1408,12 +1507,26 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
         ffIndex: resolvedTrack.ff_index !== undefined ? resolvedTrack.ff_index : null,
         externalFilename: resolvedTrack.external_filename || null,
         targetPath: finalTargetPath,
+        trackKey,
+        durationSec:
+          Number.isFinite(mediaInfo.duration) && mediaInfo.duration > 0
+            ? mediaInfo.duration
+            : null,
       });
+
+      setTrackDownloadState({ trackKey, progress: 100, status: "completed" });
+      if (downloadClearTimerRef.current !== null) {
+        window.clearTimeout(downloadClearTimerRef.current);
+      }
+      downloadClearTimerRef.current = window.setTimeout(() => {
+        setTrackDownloadState((prev) =>
+          prev?.trackKey === trackKey && prev.status === "completed" ? null : prev
+        );
+        downloadClearTimerRef.current = null;
+      }, 1400);
 
       const successLabel = curLocale === "en"
         ? (resolvedTrack.type === "audio" ? "Audio track saved" : "Subtitles saved")
-        : curLocale === "zh"
-        ? (resolvedTrack.type === "audio" ? "音轨已保存" : "字幕已保存")
         : (resolvedTrack.type === "audio" ? "Аудиодорожка сохранена" : "Субтитры сохранены");
       window.dispatchEvent(
         new CustomEvent("show-osd", {
@@ -1421,14 +1534,18 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
         })
       );
     } catch (err) {
-      console.error("Ошибка при извлечении дорожки:", err);
-      window.dispatchEvent(
-        new CustomEvent("show-osd", { detail: d.osd.subsExtractErr })
-      );
-    } finally {
-      setDownloadingTrackKey(null);
+      const wasCancelled =
+        activeDownloadCancelledRef.current === trackKey ||
+        String(err).toLowerCase().includes("отменен");
+      setTrackDownloadState((prev) => (prev?.trackKey === trackKey ? null : prev));
+      if (!wasCancelled) {
+        console.error("Ошибка при извлечении дорожки:", err);
+        window.dispatchEvent(
+          new CustomEvent("show-osd", { detail: d.osd.subsExtractErr })
+        );
+      }
     }
-  }, [mediaInfo?.path, getExtensionForTrack, tracks]);
+  }, [mediaInfo?.path, mediaInfo?.duration, getExtensionForTrack, tracks]);
 
   const contextValue = useMemo<PlayerStateContextType>(() => ({
     mediaInfo,
@@ -1454,9 +1571,11 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
     isFullscreen,
     toggleFullscreen,
     downloadingTrackKey,
+    trackDownloadState,
     isAudioDownloading,
     isSubDownloading,
     handleDownloadTrack,
+    handleCancelDownloadTrack,
     playlist,
     refreshPlaylist,
     setPlaylist,
@@ -1484,9 +1603,11 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
     isFullscreen,
     toggleFullscreen,
     downloadingTrackKey,
+    trackDownloadState,
     isAudioDownloading,
     isSubDownloading,
     handleDownloadTrack,
+    handleCancelDownloadTrack,
     playlist,
     refreshPlaylist,
     setPlaylist,

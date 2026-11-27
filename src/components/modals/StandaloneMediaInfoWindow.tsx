@@ -6,8 +6,6 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   FileText,
   X,
-  Copy,
-  Check,
   Download,
   Search,
   Loader2,
@@ -17,11 +15,12 @@ import {
   Square,
   Minimize2,
   RefreshCw,
-  Pin,
   FileUp,
   ChevronUp,
   ChevronDown,
 } from "lucide-react";
+import { CopyCheckMorphIcon } from "../common/CopyCheckMorphIcon";
+import { PinMorphIcon } from "../player/controls/PinMorphIcon";
 import { parseMediaInfoLines, MediaInfoLang } from "../../utils/mediaInfoParser";
 import {
   CategoryKey,
@@ -32,13 +31,13 @@ import {
   useMediaInfoDragDrop,
   useMediaInfoSearchNav,
 } from "./mediainfo";
-import "../../styles/mediainfo-modal.css";
+import "../../styles/modals/mediainfo-modal/mediainfo-modal.css";
 import { getCustomHotkeys, isKeyboardEventMatch } from "../../utils/hotkeyUtils";
 import { getEffectiveLocale } from "../../i18n";
 import {
   getSavedControlBarStyle,
   type ControlBarStyle,
-} from "../../utils/controlBarStyleUtils";
+} from "../../theme/controlBarStyle";
 
 interface DetailedMediaInfoResponse {
   text: string;
@@ -516,7 +515,10 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
             }
             onClick={handleToggleAlwaysOnTop}
           >
-            <Pin size={13} style={{ transform: isAlwaysOnTop ? "rotate(45deg)" : "none", color: isAlwaysOnTop ? "var(--accent-text)" : "inherit" }} />
+            <PinMorphIcon
+              pinned={isAlwaysOnTop}
+              size={14}
+            />
           </button>
           <button
             type="button"
@@ -540,7 +542,7 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
             aria-label={L("Закрыть (Esc)", "Close (Esc)", "关闭 (Esc)")}
             onClick={handleClose}
           >
-            <X size={16} strokeWidth={2} />
+            <X size={16} strokeWidth={3.2} />
           </button>
         </div>
       </div>
@@ -649,7 +651,7 @@ export const StandaloneMediaInfoWindow: React.FC = () => {
             onClick={handleCopy}
             disabled={!baseReport.rawText}
           >
-            {copied ? <Check size={14} color="var(--success-text)" /> : <Copy size={14} />}
+            <CopyCheckMorphIcon copied={copied} size={15} />
           </button>
 
           <button

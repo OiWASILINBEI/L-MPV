@@ -13,7 +13,9 @@ const labels = {
     remaining: "被占用的文件将在下次启动时重试清理。",
     done: "缓存已清理，会在使用播放器时重新生成。",
     thumbnails: "视频预览", waveforms: "时间轴热力图", subtitles: "字幕",
-    shaders: "着色器", icc: "色彩配置文件", browser: "WebView 缓存", other: "组件校验及其他缓存"
+    shaders: "着色器", icc: "色彩配置文件", liquid_glass: "Liquid Glass 着色器",
+    watch_later: "播放位置记录（mpv）", ebu128: "响度测量数据（EBU R128）",
+    browser: "WebView 缓存", other: "组件校验及其他缓存"
   },
   ru: {
     title: "Кеш", total: "Всего", refresh: "Обновить", clear: "Очистить", clearAll: "Очистить всё",
@@ -21,7 +23,9 @@ const labels = {
     remaining: "Занятые файлы будут повторно очищены при следующем запуске.",
     done: "Кеш очищен. Он будет заполняться по мере использования плеера.",
     thumbnails: "Предосмотр видео", waveforms: "Тепловые карты таймлайна", subtitles: "Субтитры",
-    shaders: "Шейдеры", icc: "Цветовые профили", browser: "Кеш WebView", other: "Проверки библиотек и прочий кеш"
+    shaders: "Шейдеры", icc: "Цветовые профили", liquid_glass: "Шейдеры Liquid Glass",
+    watch_later: "Позиции просмотра (mpv)", ebu128: "Замеры громкости (EBU R128)",
+    browser: "Кеш WebView", other: "Проверки библиотек и прочий кеш"
   },
   en: {
     title: "Cache", total: "Total", refresh: "Refresh", clear: "Clear", clearAll: "Clear all",
@@ -29,7 +33,9 @@ const labels = {
     remaining: "Busy files will be retried at the next launch.",
     done: "Cache cleared. It will fill as you use the player.",
     thumbnails: "Video previews", waveforms: "Timeline heatmaps", subtitles: "Subtitles",
-    shaders: "Shaders", icc: "Colour profiles", browser: "WebView cache", other: "Library verification and other cache"
+    shaders: "Shaders", icc: "Colour profiles", liquid_glass: "Liquid Glass shaders",
+    watch_later: "Playback positions (mpv)", ebu128: "Loudness data (EBU R128)",
+    browser: "WebView cache", other: "Library verification and other cache"
   },
 };
 export function CacheSettingsSection({ open, onToggle, folderAction }: { open: boolean; onToggle: () => void; folderAction?: ReactNode }) {

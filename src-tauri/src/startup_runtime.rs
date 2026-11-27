@@ -56,6 +56,10 @@ pub fn player_plugin<R: Runtime>(
                 settings.ambient.clone(),
             ));
             app.manage(commands::PlayerState {
+                ebu128: commands::ebu128::Ebu128::new(
+                    &exe_dir,
+                    settings.audio_normalize.as_deref(),
+                ),
                 startup_playback: std::sync::Mutex::new(None),
                 mpv,
                 ambient_controller,
@@ -116,6 +120,7 @@ pub fn schedule_maintenance<R: Runtime>(app: &tauri::AppHandle<R>) {
             }
             fonts_bundle::ensure_fonts_installed(&exe_dir);
             commands::clean_stale_temp_files(&exe_dir.join("config"));
+            commands::clean_stale_temp_files(&exe_dir.join("data"));
             logging::prune_build_logs(&exe_dir.join("logs"));
             crate::upscale::compatibility::prune_all_stale_dirs(&exe_dir);
             crate::updater::prune_stale_staging_dirs(&exe_dir);
