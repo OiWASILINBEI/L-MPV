@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save } from "@tauri-apps/plugin-dialog";
 import { getDict, getEffectiveLocale } from "../i18n";
+import { showOsd } from "../hooks/useOsd";
 import { playbackPollDelay } from "../utils/playbackPolling";
 
 export interface PlaylistItem {
@@ -1032,6 +1033,8 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
       console.error(e);
     }
     pendingVolumeRef.current = clamped;
+    const d = getDict(getEffectiveLocale());
+    showOsd(clamped === 0 ? d.osd.muted : d.osd.volume(clamped));
     // Bounded coalescing: continuous input must not postpone audio indefinitely.
     if (volumeFlushTimerRef.current === null) {
       volumeFlushTimerRef.current = setTimeout(() => {
@@ -1201,7 +1204,10 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
     if (audioTracks.length === 0) return;
     const currentIdx = audioTracks.findIndex((t) => t.selected);
     const nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % audioTracks.length;
-    await selectAudioTrack(audioTracks[nextIdx].id);
+    const next = audioTracks[nextIdx];
+    await selectAudioTrack(next.id);
+    const d = getDict(getEffectiveLocale());
+    showOsd(d.osd.audioTrack(next.title || next.lang || `#${next.id}`), { durationMs: 1400 });
   }, [tracks, selectAudioTrack]);
 
   const cycleSubTrack = useCallback(async () => {
@@ -1212,8 +1218,13 @@ export function PlayerStateProvider({ children }: { children: ReactNode }) {
     
     if (nextIdx === subTracks.length) {
       await disableSubtitles();
+      const d = getDict(getEffectiveLocale());
+      showOsd(d.osd.subTrack(d.controls.subOff), { durationMs: 1400 });
     } else {
-      await selectSubTrack(subTracks[nextIdx].id);
+      const next = subTracks[nextIdx];
+      await selectSubTrack(next.id);
+      const d = getDict(getEffectiveLocale());
+      showOsd(d.osd.subTrack(next.external_filename || next.title || next.lang || `#${next.id}`), { durationMs: 1400 });
     }
   }, [tracks, selectSubTrack, disableSubtitles]);
 
