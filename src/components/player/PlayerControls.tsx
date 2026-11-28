@@ -207,7 +207,7 @@ export function PlayerControls({
     setTimeFormat(nextFormat);
     saveTimeFormat(nextFormat);
     const option = getTimeFormatOptions(locale).find((opt) => opt.id === nextFormat);
-    showOsd(dict.osd.timeFormat(option?.label || nextFormat));
+    showOsd(dict.osd.timeFormat(option?.label || nextFormat), { icon: "clock" });
   }, [timeFormat, dict]);
 
   // Синхронизация локальных настроек плеера (не зависит от активных поповеров)
@@ -463,7 +463,7 @@ export function PlayerControls({
     window.setTimeout(() => {
       const path = mediaInfoRef.current?.path;
       if (path) {
-        showOsd(dict.osd.nowPlaying(path.split(/[/\\]/).pop() || path), { durationMs: 1800 });
+        showOsd(dict.osd.nowPlaying(path.split(/[/\\]/).pop() || path), { durationMs: 1800, icon: "play" });
       }
     }, 700);
   }, [dict.osd.nowPlaying]);
@@ -506,7 +506,7 @@ export function PlayerControls({
       // Единая команда: оба свойства выставляются вместе, иначе после
       // «повтор плейлиста» переход в «повтор файла» оставил бы оба режима.
       await invoke("set_repeat_mode", { mode: nextMode });
-      showOsd(repeatLabel, { durationMs: 1200 });
+      showOsd(repeatLabel, { durationMs: 1200, icon: "repeat" });
     } catch (e) {
       console.error(e);
       // Откат локального состояния: иначе иконка расходится с mpv.
@@ -548,7 +548,7 @@ export function PlayerControls({
   const handleShuffle = async () => {
     try {
       await invoke("toggle_shuffle");
-      showOsd(dict.controls.shuffle, { durationMs: 1200 });
+      showOsd(dict.controls.shuffle, { durationMs: 1200, icon: "shuffle" });
     } catch (e) {
       console.error(e);
     }
@@ -562,7 +562,7 @@ export function PlayerControls({
       const current = await appWindow.isAlwaysOnTop();
       await appWindow.setAlwaysOnTop(!current);
       setIsAlwaysOnTop(!current);
-      showOsd(`${dict.controls.alwaysOnTop}: ${!current ? dict.osd.enabled : dict.osd.disabled}`, { durationMs: 1200, icon: "info" });
+      showOsd(`${dict.controls.alwaysOnTop}: ${!current ? dict.osd.enabled : dict.osd.disabled}`, { durationMs: 1200, icon: "pin" });
     } catch (e) { console.error(e); }
   };
 

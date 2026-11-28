@@ -708,7 +708,7 @@ export function ContextMenu({
     setVisibleButtons(updated);
     localStorage.setItem("l-mpv-visible-buttons", JSON.stringify(updated));
     window.dispatchEvent(new Event("l-mpv-settings-changed"));
-    showOsd(dict.settings.cmenuUI.osdBtn(label, nextVal));
+    showOsd(dict.settings.cmenuUI.osdBtn(label, nextVal), { icon: "settings" });
   }, [visibleButtons, dict.settings.cmenuUI]);
 
   const audioTracks = useMemo(() => tracks.filter((t) => t.type === "audio"), [tracks]);
@@ -719,7 +719,7 @@ export function ContextMenu({
     (pos: TimeDisplayPosition, label: string) => {
       saveTimePosition(pos);
       setCurrentTimePos(pos);
-      showOsd(dict.settings.cmenuUI.osdTime(label));
+      showOsd(dict.settings.cmenuUI.osdTime(label), { icon: "clock" });
     },
     [dict.settings.cmenuUI]
   );
@@ -728,7 +728,7 @@ export function ContextMenu({
     (fmt: TimeFormatMode, label: string) => {
       saveTimeFormat(fmt);
       setTimeFormat(fmt);
-      showOsd(dict.settings.cmenuUI.osdTimeFmt(label));
+      showOsd(dict.settings.cmenuUI.osdTimeFmt(label), { icon: "clock" });
     },
     [dict.settings.cmenuUI]
   );
@@ -750,7 +750,7 @@ export function ContextMenu({
       }
       saveControlBarStyle(style, getPlayerTheme());
       setControlBarStyle(style);
-      showOsd(dict.settings.cmenuUI.osdBarStyle(label));
+      showOsd(dict.settings.cmenuUI.osdBarStyle(label), { icon: "settings" });
     },
     [dict.settings.cmenuUI]
   );
@@ -800,7 +800,7 @@ export function ContextMenu({
         source === "audio"
           ? dict.settings.appearance.heatmap?.sources?.audio || "Громкость звука"
           : dict.settings.appearance.heatmap?.sources?.videoBitrate || "Битрейт видео";
-      showOsd(`${dict.settings.cmenuUI.heatmap}: ${sourceName}`);
+      showOsd(`${dict.settings.cmenuUI.heatmap}: ${sourceName}`, { icon: "heatmap" });
     },
     [dict.settings.cmenuUI, dict.settings.appearance.heatmap?.sources]
   );
@@ -815,7 +815,7 @@ export function ContextMenu({
           : style === "spline"
           ? dict.settings.appearance.heatmap?.styles?.spline || "Сплайн-рельеф"
           : dict.settings.appearance.heatmap?.styles?.blocks || "Ступенчатые блоки";
-      showOsd(`${dict.settings.cmenuUI.heatmap}: ${styleName}`);
+      showOsd(`${dict.settings.cmenuUI.heatmap}: ${styleName}`, { icon: "heatmap" });
     },
     [dict.settings.cmenuUI, dict.settings.appearance.heatmap?.styles]
   );

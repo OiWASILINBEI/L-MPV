@@ -19,6 +19,12 @@ export type HudIconType =
   | "ambient"
   | "language"
   | "sparkles"
+  | "shuffle"
+  | "pin"
+  | "clock"
+  | "heatmap"
+  | "settings"
+  | "play"
   | "info";
 
 /**

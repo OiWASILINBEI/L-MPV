@@ -74,6 +74,18 @@ function renderHudIconByType(icon: HudIconType): React.ReactNode {
       return <Languages size={18} className="glass-hud__icon glass-hud__icon--accent" />;
     case "sparkles":
       return <Sparkles size={18} className="glass-hud__icon glass-hud__icon--accent" />;
+    case "shuffle":
+      return <Shuffle size={18} className="glass-hud__icon glass-hud__icon--accent" />;
+    case "pin":
+      return <Pin size={18} className="glass-hud__icon glass-hud__icon--accent" />;
+    case "clock":
+      return <Clock size={18} className="glass-hud__icon glass-hud__icon--accent" />;
+    case "heatmap":
+      return <Flame size={18} className="glass-hud__icon glass-hud__icon--accent" />;
+    case "settings":
+      return <SlidersHorizontal size={18} className="glass-hud__icon glass-hud__icon--accent" />;
+    case "play":
+      return <Play size={18} className="glass-hud__icon glass-hud__icon--accent" />;
     case "info":
     default:
       return <Info size={18} className="glass-hud__icon" />;
